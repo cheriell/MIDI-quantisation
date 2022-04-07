@@ -23,6 +23,12 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
     args = parser.parse_args()
 
+    # ========= input check =========
+    # dataset_folder
+    # feature_folder
+    # workers
+    # verbose
+
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
     featprep.prepare_metadata()
     featprep.prepare_features()
@@ -58,7 +64,7 @@ class FeaturePreparation():
     def prepare_metadata(self):
         self.verboseprint('INFO: Preparing metadata...')
 
-        # get ACPAS metadata
+        # =========== get ACPAS metadata ===========
         self.verboseprint('INFO: Getting ACPAS metadata')
         ACPAS_metadata_S = pd.read_csv(str(Path(self.ACPAS, 'metadata_S.csv')))
         ACPAS_metadata_R = pd.read_csv(str(Path(self.ACPAS, 'metadata_R.csv')))
@@ -67,7 +73,7 @@ class FeaturePreparation():
             ACPAS_metadata_S
         ], ignore_index=True)
 
-        # create metadata
+        # ============ create metadata ============
         self.verboseprint('INFO: Creating metadata')
         metadata = pd.DataFrame(columns=[
             'performance_id',
@@ -131,7 +137,7 @@ class FeaturePreparation():
                 'feature_file': str(feature_file),
             }, ignore_index=True)
 
-        # save metadata
+        # ======== save metadata ==========
         metadata.to_csv(str(Path(self.feature_folder, 'metadata.csv')), index=False)
         self.verboseprint('INFO: Metadata saved to {}'.format(Path(self.feature_folder, 'metadata.csv')))
         
@@ -157,7 +163,7 @@ class FeaturePreparation():
             feature = (note_sequence, beats)
             pickle.dump(feature, open(row['feature_file'], 'wb'))
 
-        # prepare features
+        # prepare features with multiprocessing
         rows = [row for _, row in self.metadata.iterrows()]
         pool = Pool(self.workers)
         pool.map(prepare_one_feature, rows)

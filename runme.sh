@@ -22,9 +22,10 @@ python3 quantmidi/feature_preparation.py \
 
 # =============== Training ===============
 
-python3 quantmidi/train_model.py \
+python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
     --workspace $WORKSPACE \
+    --experiment_name 'input_comparison' \
     --workers 8 \
     --verbose
 
