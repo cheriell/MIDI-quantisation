@@ -11,21 +11,27 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # script to download the dataset
 
 # =============== Feature preparation ================
+echo ">>> Preparing the features"
 
 WORKSPACE="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation"
 
-python3 quantmidi/feature_preparation.py \
-    --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
-    --feature_folder $WORKSPACE/features \
-    --workers 8 \
-    --verbose
+# python3 quantmidi/feature_preparation.py \
+#     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
+#     --feature_folder $WORKSPACE/features \
+#     --workers 8 \
+#     --verbose
 
 # =============== Training ===============
+echo ">>> Training the model"
+
+experiment_name="input_comparison"
+model_type="note_sequence"
 
 python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
     --workspace $WORKSPACE \
-    --experiment_name 'input_comparison' \
+    --experiment_name $experiment_name \
+    --model_type $model_type \
     --workers 8 \
     --verbose
 
