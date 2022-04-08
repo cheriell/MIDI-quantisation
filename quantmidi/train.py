@@ -7,10 +7,18 @@ import pytorch_lightning as pl
 from pathlib import Path
 
 from quantmidi.data import QuantMIDIDataModule
+from quantmidi.model import QuantMIDIModel
 
+## -------------------------
+## DEBUGGING BLOCK
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+import torch
+torch.autograd.set_detect_anomaly(True)
+## END DEBUGGING BLOCK
+## -------------------------
 
 def main():
-    # parse arguments
+    # ========= parse arguments =========
     parser = argparse.ArgumentParser(description='Main programme for model training.')
     parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders \
                         in the order of ASAP, A_MAPS, CPM, ACPAS')
@@ -20,6 +28,13 @@ def main():
     parser.add_argument('--experiment_name', type=str, help='Name of the experiment', default='full-training')
     parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
                         [pianoroll]', default='note_sequence')
+    # ablation study - input data comparison
+    parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
+                        more from [pitch, onset, duration, velocity]', default=['onset', 'duration'])
+    parser.add_argument('--onset_encoding', type=str, help='Encoding of onset features. Select one from \
+                        [absolute-raw, shift-raw, absolute-onehot, shift-onehot].', default='shift-raw')
+    parser.add_argument('--duration_encoding', type=str, help='Encoding of duration features. Select one \
+                        from [raw, onehot].', default='raw')
 
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
@@ -39,24 +54,29 @@ def main():
 
 def train(args):
 
-    feature_folder = args.workspace + '/features'
+    feature_folder = str(Path(args.workspace, 'features'))
+    tracking_uri = str(Path(args.workspace, 'mlruns'))
 
     datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
                                     workers=args.workers)
-    model = QuantMIDIModel(args.model_type)
-
-    logger = pl.loggers.TensorBoardLogger(
-        save_dir=str(Path(args.workspace, 'tflogs', args.experiment_name)),
-        name=args.experiment_name,
+    model = QuantMIDIModel(
+        model_type=args.model_type,
+        features=args.features,
+        onset_encoding=args.onset_encoding,
+        duration_encoding=args.duration_encoding,
+    )
+    logger = pl.loggers.MLFlowLogger(
+        tracking_uri=tracking_uri,
+        experiment_name=args.experiment_name,
     )
 
     trainer = pl.Trainer(
-        default_save_path=str(Path(args.workspace, 'models', args.experiment_name)),
+        default_root_dir=tracking_uri,
         logger=logger,
-        log_every_n_steps=100,
-        reload_dataloaders_every_epoch=True,
-        auto_select_gpus=True,
+        log_every_n_steps=50,
+        reload_dataloaders_every_n_epochs=True,
         gpus=[0,1,2,3],
+        # auto_select_gpus=True,
         # resume_from_checkpoint='19/0f4d93088716431fb52854d9162e9582/checkpoints/last.ckpt',
     )
     trainer.fit(model, datamodule=datamodule)

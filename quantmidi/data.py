@@ -80,8 +80,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
         # get feature
         note_sequence, beats = pickle.load(open(str(Path(self.feature_folder, row['feature_file'])), 'rb'))
-        note_sequence = note_sequence.to('cuda')
-        beats = beats.to('cuda')
+        note_sequence = note_sequence
+        beats = beats
 
         # data augmentation
         note_sequence, beats = self.dataaug(note_sequence, beats)
@@ -101,24 +101,25 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             # =========== get model output ===========
             # onset to beat dict
             end_time = max(beats[-1], note_sequence[-1][1] + note_sequence[-1][2]) + 1.0
-            onset2beat = torch.zeros(int(torch.ceil(end_time / resolution))).to('cuda')
+            onset2beat = torch.zeros(int(torch.ceil(end_time / resolution)))
             for beat in beats:
                 l = torch.round((beat - tolerance) / resolution).to(int)
                 r = torch.round((beat + tolerance) / resolution).to(int)
                 onset2beat[l:r+1] = 1.0
             
             # get beat probabilities at note onsets
-            beat_probs = torch.zeros(len(note_sequence), dtype=torch.float32).to('cuda')
+            beat_probs = torch.zeros(len(note_sequence), dtype=torch.float32)
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
                 beat_probs[i] = onset2beat[torch.round(onset / resolution).to(int)]
 
             # ============ pad if length is shorter than max_length ============
+            length = len(note_sequence)
             if len(note_sequence) < max_length:
-                note_sequence = torch.cat([note_sequence, torch.zeros((max_length - len(note_sequence), 4)).to('cuda')])
-                beat_probs = torch.cat([beat_probs, torch.zeros(max_length - len(beat_probs)).to('cuda')])
+                note_sequence = torch.cat([note_sequence, torch.zeros((max_length - len(note_sequence), 4))])
+                beat_probs = torch.cat([beat_probs, torch.zeros(max_length - len(beat_probs))])
 
-            return note_sequence, beat_probs
+            return note_sequence, beat_probs, length
 
         def sample_segment_pianoroll(note_sequence, beats):
             return
