@@ -36,7 +36,8 @@ def main():
     parser.add_argument('--duration_encoding', type=str, help='Encoding of duration features. Select one \
                         from [raw, onehot].', default='raw')
 
-    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing')
+    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing', default=8)
+    parser.add_argument('--gpus', type=int, help='Number of GPUs to use', default=4)
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
     args = parser.parse_args()
 
@@ -75,7 +76,7 @@ def train(args):
         logger=logger,
         log_every_n_steps=50,
         reload_dataloaders_every_n_epochs=True,
-        gpus=[0,1,2,3],
+        gpus=args.gpus,
         # auto_select_gpus=True,
         # resume_from_checkpoint='19/0f4d93088716431fb52854d9162e9582/checkpoints/last.ckpt',
     )

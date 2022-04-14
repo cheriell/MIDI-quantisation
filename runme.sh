@@ -26,9 +26,13 @@ echo ">>> Training the model"
 
 experiment_name="input_comparison"
 model_type="note_sequence"
+
 features="onset duration"
 onset_encoding="shift-raw"
 duration_encoding="raw"
+
+workers="8"
+gpus="4"
 
 python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
@@ -38,6 +42,7 @@ python3 quantmidi/train.py \
     --features $features \
     --onset_encoding $onset_encoding \
     --duration_encoding $duration_encoding \
-    --workers 8 \
+    --workers $workers \
+    --gpus $gpus \
     --verbose
 

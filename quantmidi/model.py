@@ -3,6 +3,7 @@ import torch
 torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 learning_rate = 1e-3
 
@@ -47,11 +48,9 @@ class QuantMIDIModel(pl.LightningModule):
 
         # compute loss
         loss = F.binary_cross_entropy(y_hat, y)
-        logs = {'train_loss': loss}
-        for k, v in logs.items():
-            self.log(k, v, sync_dist=True)
+        self.log('train_loss', loss, sync_dist=True)
 
-        return {'loss': loss, 'logs': logs}
+        return {'loss': loss, 'logs': {'train_loss': loss}}
     
     def validation_step(self, batch, batch_idx):
         # data
@@ -69,7 +68,29 @@ class QuantMIDIModel(pl.LightningModule):
 
         # compute loss
         loss = F.binary_cross_entropy(y_hat, y)
-        logs = {'val_loss': loss}
+
+        # metrics
+        for i in range(x.shape[0]):
+            y_hat_i = torch.round(y_hat[i, :length[i]])
+            y_i = y[i, :length[i]]
+
+            acc = (y_hat_i == y_i).float().mean()
+            TP = torch.logical_and(y_hat_i==1, y_i==1).float().sum()
+            FP = torch.logical_and(y_hat_i==1, y_i==0).float().sum()
+            FN = torch.logical_and(y_hat_i==0, y_i==1).float().sum()
+
+            p = TP / (TP + FP + np.finfo(float).eps)
+            r = TP / (TP + FN + np.finfo(float).eps)
+            f1 = 2 * p * r / (p + r + np.finfo(float).eps)
+
+        # log
+        logs = {
+            'val_loss': loss,
+            'val_acc': acc,
+            'val_p': p,
+            'val_r': r,
+            'val_f1': f1,
+        }
         for k, v in logs.items():
             self.log(k, v, sync_dist=True)
 
