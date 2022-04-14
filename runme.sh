@@ -26,12 +26,18 @@ echo ">>> Training the model"
 
 experiment_name="input_comparison"
 model_type="note_sequence"
+features="onset duration"
+onset_encoding="shift-raw"
+duration_encoding="raw"
 
 python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
     --workspace $WORKSPACE \
     --experiment_name $experiment_name \
     --model_type $model_type \
+    --features $features \
+    --onset_encoding $onset_encoding \
+    --duration_encoding $duration_encoding \
     --workers 8 \
     --verbose
 

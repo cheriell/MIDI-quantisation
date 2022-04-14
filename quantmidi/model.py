@@ -40,7 +40,7 @@ class QuantMIDIModel(pl.LightningModule):
         y_hat = self(x)
 
         # mask out the padded part (avoid inplace operation)
-        mask = torch.zeros(y_hat.shape).float().to(y_hat.device)
+        mask = torch.ones(y_hat.shape).float().to(y_hat.device)
         for i in range(y_hat.shape[0]):
             mask[i, length[i]:] = 0
         y_hat = y_hat * mask

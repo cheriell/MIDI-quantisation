@@ -70,7 +70,11 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         self.dataaug = DataAugmentation()
 
     def __len__(self):
-        return len(self.metadata) * 32
+        if self.split == 'train':
+            return batch_size * 4 * 500     # constantly update 500 steps per epoch
+                                            # not related to training dataset size
+        else:
+            return batch_size * len(self.metadata)  # valid dataset size
 
     def __getitem__(self, idx):
         # random sampling by piece
