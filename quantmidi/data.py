@@ -13,7 +13,7 @@ import numpy as np
 batch_size = 32
 max_length = 500  # maximum note sequence length during training
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
-tolerance = 0.02  # tolerance for beat alignment: 0.02s = 20ms
+tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
 
 
 class QuantMIDIDataModule(LightningDataModule):
