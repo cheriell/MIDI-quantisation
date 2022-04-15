@@ -35,8 +35,8 @@ def main():
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
     # featprep.prepare_metadata()
     featprep.load_metadata()
-    featprep.print_statistics()
     # featprep.prepare_features()
+    featprep.print_statistics()
 
 
 class FeaturePreparation():
@@ -196,14 +196,17 @@ class FeaturePreparation():
         self.verboseprint('INFO: Get duration & number of notes')
 
         def cache_duration_n_notes(row):
-            if row['performance_id'] in perfms_all:
-                self.verboseprint('INFO: Get duration & number of notes for performance {}'.format(row['performance_id']))
+            if row['performance_id'] not in perfms_all:
+                return
+            
+            self.verboseprint('INFO: Get duration & number of notes for performance {}'.format(row['performance_id']))
 
-                midi_data = pm.PrettyMIDI(row['midi_perfm'])
-                duration = midi_data.get_end_time()
-                n_notes = np.sum([len(midi_data.instruments[i].notes) for i in range(len(midi_data.instruments))])
+            midi_data = pm.PrettyMIDI(row['midi_perfm'])
+            duration = midi_data.get_end_time()
+            n_notes = np.sum([len(midi_data.instruments[i].notes) for i in range(len(midi_data.instruments))])
 
-                pickle.dump((duration, n_notes), open(str(Path(self.feature_folder, 'temp', row['performance_id']+'.pkl')), 'wb'))
+            cache_file = Path(self.feature_folder, 'temp', row['performance_id']+'.pkl')
+            pickle.dump((duration, n_notes), open(str(cache_file), 'wb'))
 
         Path(self.feature_folder, 'temp').mkdir(parents=True, exist_ok=True)
         rows = [row for _, row in self.metadata.iterrows()]
@@ -214,18 +217,22 @@ class FeaturePreparation():
         n_notes_train, n_notes_valid, n_notes_test = 0, 0, 0
 
         for _, row in self.metadata.iterrows():
-            if row['performance_id'] in perfms_all:
-                duration, n_notes = pickle.load(open(str(Path(self.feature_folder, 'temp', row['feature_file'])), 'rb'))
+            if row['performance_id'] not in perfms_all:
+                continue
 
-                if row['performance_id'] in perfms['train']:
-                    duration_train += duration
-                    n_notes_train += n_notes
-                elif row['performance_id'] in perfms['valid']:
-                    duration_valid += duration
-                    n_notes_valid += n_notes
-                elif row['performance_id'] in perfms['test']:
-                    duration_test += duration
-                    n_notes_test += n_notes
+            cache_file = Path(self.feature_folder, 'temp', row['performance_id']+'.pkl')
+            duration, n_notes = pickle.load(open(str(cache_file), 'rb'))
+
+            if row['performance_id'] in perfms['train']:
+                duration_train += duration
+                n_notes_train += n_notes
+            elif row['performance_id'] in perfms['valid']:
+                duration_valid += duration
+                n_notes_valid += n_notes
+            elif row['performance_id'] in perfms['test']:
+                duration_test += duration
+                n_notes_test += n_notes
+
         shutil.rmtree(str(Path(self.feature_folder, 'temp')))
 
         duration_all = duration_train + duration_valid + duration_test
@@ -234,10 +241,14 @@ class FeaturePreparation():
         # ======== print dataset statistics ==========
         self.verboseprint('\n\t=================== Dataset Statistics ====================')
         self.verboseprint('\t\t\tTrain\t\tValid\t\tTest\t\tAll')
-        self.verboseprint('\tn_pieces:\t{}\t\t{}\t\t{}\t\t{}'.format(n_pieces_train, n_pieces_valid, n_pieces_test, n_pieces))
-        self.verboseprint('\tn_perfms:\t{}\t\t{}\t\t{}\t\t{}'.format(n_perfms_train, n_perfms_valid, n_perfms_test, n_perfms))
-        self.verboseprint('\tduration (h):\t{:.1f}\t\t{:.1f}\t\t{:.1f}\t\t{:.1f}'.format(duration_train/3600, duration_valid/3600, duration_test/3600, duration_all/3600))
-        self.verboseprint('\tn_notes (k):\t{:.1f}\t\t{:.1f}\t\t{:.1f}\t\t{:.1f}\n'.format(n_notes_train/1000, n_notes_valid/1000, n_notes_test/1000, n_notes_all/1000))
+        self.verboseprint('\tn_pieces:\t{}\t\t{}\t\t{}\t\t{}'.format(n_pieces_train, n_pieces_valid, \
+                            n_pieces_test, n_pieces))
+        self.verboseprint('\tn_perfms:\t{}\t\t{}\t\t{}\t\t{}'.format(n_perfms_train, n_perfms_valid, \
+                            n_perfms_test, n_perfms))
+        self.verboseprint('\tduration (h):\t{:.1f}\t\t{:.1f}\t\t{:.1f}\t\t{:.1f}'.format(duration_train/3600, \
+                            duration_valid/3600, duration_test/3600, duration_all/3600))
+        self.verboseprint('\tn_notes (k):\t{:.1f}\t\t{:.1f}\t\t{:.1f}\t\t{:.1f}\n'.format(n_notes_train/1000, \
+                            n_notes_valid/1000, n_notes_test/1000, n_notes_all/1000))
         
     def prepare_features(self):
         self.verboseprint('INFO: Preparing features...')
