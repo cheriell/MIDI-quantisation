@@ -35,7 +35,7 @@ def main():
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
     # featprep.prepare_metadata()
     featprep.load_metadata()
-    # featprep.prepare_features()
+    featprep.prepare_features()
     featprep.print_statistics()
 
 
