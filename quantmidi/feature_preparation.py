@@ -1,3 +1,4 @@
+from collections import defaultdict
 import warnings
 warnings.filterwarnings('ignore')
 import sys, os
@@ -30,8 +31,10 @@ def main():
     # verbose
 
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
-    featprep.prepare_metadata()
-    featprep.prepare_features()
+    # featprep.prepare_metadata()
+    featprep.load_metadata()
+    featprep.print_statistics()
+    # featprep.prepare_features()
 
 
 class FeaturePreparation():
@@ -144,8 +147,46 @@ class FeaturePreparation():
         self.metadata = metadata
 
     def load_metadata(self):
+        self.verboseprint('INFO: Loading metadata...')
         self.metadata = pd.read_csv(str(Path(self.feature_folder, 'metadata.csv')))
 
+    def print_statistics(self):
+        self.verboseprint('INFO: Printing dataset statistics')
+
+        # ======== get dataset statistics ==========
+        # number of distinct pieces
+        pieces_train = set(self.metadata[self.metadata['split'] == 'train']['piece_id'].unique())
+        pieces_valid = set(self.metadata[self.metadata['split'] == 'valid']['piece_id'].unique())
+        pieces_test = set(self.metadata[self.metadata['split'] == 'test']['piece_id'].unique())
+
+        n_pieces_train = len(pieces_train)
+        n_pieces_valid = len(pieces_valid)
+        n_pieces_test = len(pieces_test)
+        n_pieces = n_pieces_train + n_pieces_valid + n_pieces_test
+        
+        # number of performances
+        piece2perf = defaultdict(set)
+        for _, row in self.metadata.iterrows():
+            if row['source'] == 'ASAP':
+                performance = row['midi_perfm']
+            elif row['source'] == 'MAPS':
+                performance = '_'.join(row['midi_perfm'].split('/')[-1][len('MAPS_MUS-'):].split('_')[:-1])
+            elif row['source'] == 'CPM':
+                performance = row['midi_perfm'].split('/')[-1][:-4]
+            piece2perf[row['piece_id']].add(performance)
+
+        n_perfms_train = sum(len(perfms) for piece, perfms in piece2perf.items() if piece in pieces_train)
+        n_perfms_valid = sum(len(perfms) for piece, perfms in piece2perf.items() if piece in pieces_valid)
+        n_perfms_test = sum(len(perfms) for piece, perfms in piece2perf.items() if piece in pieces_test)
+        n_perfms = n_perfms_train + n_perfms_valid + n_perfms_test
+
+        # duration
+        
+
+        # ======== print dataset statistics ==========
+        self.verboseprint('\n\tNumber of distinct music pieces: {}'.format(n_pieces))
+        
+        
     def prepare_features(self):
         self.verboseprint('INFO: Preparing features...')
 

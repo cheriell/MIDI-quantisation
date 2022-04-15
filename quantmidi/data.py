@@ -84,8 +84,6 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
         # get feature
         note_sequence, beats = pickle.load(open(str(Path(self.feature_folder, row['feature_file'])), 'rb'))
-        note_sequence = note_sequence
-        beats = beats
 
         # data augmentation
         if self.split == 'train':
@@ -95,7 +93,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
         def sample_segment_note_sequence(note_sequence, beats):
             # ========== get model input ==========
-            # randomly select a segment of max_length
+            # list of tuples (pitch, onset, duration, velocity) in torch tensor
+            # randomly select a segment by max_length
             if len(note_sequence) > max_length:
                 start_idx = random.randint(0, len(note_sequence) - max_length)
                 end_idx = start_idx + max_length
@@ -104,6 +103,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             note_sequence = note_sequence[start_idx:end_idx]
 
             # =========== get model output ===========
+            # list of beat probs in torch tensor
             # onset to beat dict
             end_time = max(beats[-1], note_sequence[-1][1] + note_sequence[-1][2]) + 1.0
             onset2beat = torch.zeros(int(torch.ceil(end_time / resolution)))
@@ -187,13 +187,16 @@ class DataAugmentation():
 
     def missing_note(self, note_sequence):
         # find successing concurrent notes
-        candidates = torch.diff(note_sequence[:,1]) == 0
+        candidates = torch.diff(note_sequence[:,1]) < tolerance
+
         # randomly select a ratio of candidates to be removed
         ratio = random.random()
         candidates_probs = candidates * torch.rand(len(candidates))
         remaining = torch.cat([torch.tensor([True]), candidates_probs < (1 - ratio)])
 
-        note_sequence = note_sequence[remaining.long()]
+        # remove selected candidates
+        note_sequence = note_sequence[remaining]
+
         return note_sequence
 
 class DataUtils():

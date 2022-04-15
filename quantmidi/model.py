@@ -113,16 +113,16 @@ class QuantMIDIModel(pl.LightningModule):
     
     def configure_callbacks(self):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor='val_loss',
-            mode='min',
+            monitor='val_f1',
+            mode='max',
             save_top_k=5,
             filename='{epoch}-{val_loss:.4f}.ckpt',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(
-            monitor='val_loss',
+            monitor='val_f1',
             patience=500,
-            mode='min',
+            mode='max',
         )
         return [checkpoint_callback, earlystop_callback]
 

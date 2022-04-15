@@ -4,6 +4,7 @@ import os, sys
 sys.path.insert(0, os.path.abspath('./'))
 import argparse
 import pytorch_lightning as pl
+pl.seed_everything(42)
 from pathlib import Path
 
 from quantmidi.data import QuantMIDIDataModule
