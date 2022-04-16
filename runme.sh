@@ -24,11 +24,11 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 echo ">>> Training the model"
 
 experiment_name="input_encodings"
-run_name="chroma_pitch"
+run_name="midi_pitch_stepSize=1000"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
-pitch_encoding="chroma"
+pitch_encoding="midi"
 onset_encoding="shift-raw"
 duration_encoding="raw"
 
