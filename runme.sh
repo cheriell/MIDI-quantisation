@@ -23,10 +23,12 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training ===============
 echo ">>> Training the model"
 
-experiment_name="input_comparison"
+experiment_name="input_encodings"
+run_name="chroma_pitch"
 model_type="note_sequence"
 
-features="onset duration"
+features="pitch onset duration velocity"
+pitch_encoding="chroma"
 onset_encoding="shift-raw"
 duration_encoding="raw"
 
@@ -37,8 +39,10 @@ python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
     --workspace $WORKSPACE \
     --experiment_name $experiment_name \
+    --run_name $run_name \
     --model_type $model_type \
     --features $features \
+    --pitch_encoding $pitch_encoding \
     --onset_encoding $onset_encoding \
     --duration_encoding $duration_encoding \
     --workers $workers \

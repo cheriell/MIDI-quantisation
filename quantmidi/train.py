@@ -21,24 +21,32 @@ torch.autograd.set_detect_anomaly(True)
 def main():
     # ========= parse arguments =========
     parser = argparse.ArgumentParser(description='Main programme for model training.')
+
+    # dataset path and workspace
     parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders \
                         in the order of ASAP, A_MAPS, CPM, ACPAS')
     parser.add_argument('--workspace', type=str, help='Path to the workspace')
 
     # experiment settings
     parser.add_argument('--experiment_name', type=str, help='Name of the experiment', default='full-training')
+    parser.add_argument('--run_name', type=str, help='Name of the run', default='run-0')
     parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
                         [pianoroll]', default='note_sequence')
-    # ablation study - input data comparison
+
+    # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
                         more from [pitch, onset, duration, velocity]', default=['onset', 'duration'])
+    parser.add_argument('--pitch_encoding', type=str, help='Pitch encoding, select from [midi, chroma]', \
+                        default='midi')
     parser.add_argument('--onset_encoding', type=str, help='Encoding of onset features. Select one from \
                         [absolute-raw, shift-raw, absolute-onehot, shift-onehot].', default='shift-raw')
     parser.add_argument('--duration_encoding', type=str, help='Encoding of duration features. Select one \
                         from [raw, onehot].', default='raw')
 
+    # parallelization
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing', default=8)
     parser.add_argument('--gpus', type=int, help='Number of GPUs to use', default=4)
+
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
     args = parser.parse_args()
 
@@ -64,12 +72,22 @@ def train(args):
     model = QuantMIDIModel(
         model_type=args.model_type,
         features=args.features,
+        pitch_encoding=args.pitch_encoding,
         onset_encoding=args.onset_encoding,
         duration_encoding=args.duration_encoding,
     )
+
     logger = pl.loggers.MLFlowLogger(
-        tracking_uri=tracking_uri,
         experiment_name=args.experiment_name,
+        tracking_uri=tracking_uri,
+        run_name=args.run_name,
+        tags={
+            'model_type': args.model_type,
+            'features': ','.join(args.features),
+            'pitch_encoding': args.pitch_encoding,
+            'onset_encoding': args.onset_encoding,
+            'duration_encoding': args.duration_encoding,
+        },
     )
 
     trainer = pl.Trainer(
@@ -82,7 +100,6 @@ def train(args):
         # resume_from_checkpoint='19/0f4d93088716431fb52854d9162e9582/checkpoints/last.ckpt',
     )
     trainer.fit(model, datamodule=datamodule)
-
 
 if __name__ == '__main__':
     main()

@@ -11,6 +11,7 @@ class QuantMIDIModel(pl.LightningModule):
     def __init__(self, 
         model_type='note_sequence',
         features=['onset', 'duration'],
+        pitch_encoding='midi',
         onset_encoding='shift-raw',
         duration_encoding='raw',
     ):
@@ -21,6 +22,7 @@ class QuantMIDIModel(pl.LightningModule):
         if model_type == 'note_sequence':
             self.model = QuantMIDISequenceModel(
                 features=features,
+                pitch_encoding=pitch_encoding,
                 onset_encoding=onset_encoding,
                 duration_encoding=duration_encoding,
             )
@@ -48,7 +50,7 @@ class QuantMIDIModel(pl.LightningModule):
 
         # compute loss
         loss = F.binary_cross_entropy(y_hat, y)
-        self.log('train_loss', loss, sync_dist=True)
+        self.log('train_loss', loss, prog_bar=True)
 
         return {'loss': loss, 'logs': {'train_loss': loss}}
     
@@ -91,8 +93,7 @@ class QuantMIDIModel(pl.LightningModule):
             'val_r': r,
             'val_f1': f1,
         }
-        for k, v in logs.items():
-            self.log(k, v, sync_dist=True)
+        self.log_dict(logs, prog_bar=True)
 
         return {'val_loss': loss, 'logs': logs}
     
@@ -130,6 +131,7 @@ class QuantMIDIModel(pl.LightningModule):
 class QuantMIDISequenceModel(nn.Module):
     def __init__(self, 
         features=['onset', 'duration'],
+        pitch_encoding='midi',
         onset_encoding='shift-raw',
         duration_encoding='raw',
         hidden_size=512,
@@ -143,6 +145,7 @@ class QuantMIDISequenceModel(nn.Module):
         Args:
             features (list): List of features to use as input. Select one or more from [pitch, onset,
                             duration, velocity].
+            pitch_encoding (str): Encoding of the pitch. Select one from ['midi', 'chroma'].
             onset_encoding (str): Encoding of onset features. Select one from ['absolute-raw', 'shift-raw',
                             'absolute-onehot', 'shift-onehot'].
             duration_encoding (str): Encoding of duration features. Select one from ['raw', 'onehot'].
@@ -154,10 +157,11 @@ class QuantMIDISequenceModel(nn.Module):
         super().__init__()
 
         self.features = features
+        self.pitch_encoding = pitch_encoding
         self.onset_encoding = onset_encoding
         self.duration_encoding = duration_encoding
         
-        in_features = ModelUtils.get_encoding_in_features(features, onset_encoding, duration_encoding)
+        in_features = ModelUtils.get_encoding_in_features(features, pitch_encoding, onset_encoding, duration_encoding)
 
         # ======== CNNBlock ========
         self.conv_layers = nn.Sequential(
@@ -211,7 +215,7 @@ class QuantMIDISequenceModel(nn.Module):
         # x.shape = (batch_size, max_length, len(features))
 
         # ======== Encoding ========
-        x = ModelUtils.encode_input_feature(x, self.features, self.onset_encoding, self.duration_encoding)
+        x = ModelUtils.encode_input_feature(x, self.features, self.pitch_encoding, self.onset_encoding, self.duration_encoding)
         # x.shape = (batch_size, max_length, in_features)
 
         # ======== CNNBlock ========
@@ -260,13 +264,14 @@ class ModelUtils():
         return x
         
     @staticmethod
-    def encode_input_feature(x, features, onset_encoding, duration_encoding):
+    def encode_input_feature(x, features, pitch_encoding, onset_encoding, duration_encoding):
         """
         Encode input features.
 
         Args:
             x (torch.Tensor): Input tensor.
             features (list): List of features.
+            pitch_encoding (str): Encoding of the pitch. Select one from ['midi', 'chroma'].
             onset_encoding (str): Encoding of onset features. Select one from ['absolute-raw', 'shift-raw',
                             'absolute-onehot', 'shift-onehot'].
             duration_encoding (str): Encoding of duration features. Select one from ['raw', 'onehot'].
@@ -279,52 +284,54 @@ class ModelUtils():
 
         # ======== Encode ========
         for feature in features:
+            x_feature = x[:,:,feature2idx[feature]].clone()
+
             # pitch
             if feature == 'pitch':
-                pass
+                if pitch_encoding == 'midi':
+                    vocab_size = 128
+                elif pitch_encoding == 'chroma':
+                    vocab_size = 12
+                    x_feature = x_feature % 12
+                x_encoded = F.one_hot(x_feature.long(), vocab_size).float()
 
             # onset
             elif feature == 'onset':
-                onsets = x[:,:,feature2idx['onset']]
-
                 if onset_encoding == 'absolute-raw':
-                    onsets_encoded = onsets.float().unsqueeze(2)
+                    x_encoded = x_feature.float().unsqueeze(2)
                 elif onset_encoding == 'shift-raw':
-                    onsets_shift = onsets[:,1:] - onsets[:,:-1]
-                    onsets_encoded = torch.zeros(x.shape[0], x.shape[1], 1).float().to(x.device)
-                    onsets_encoded[:,1:,0] = onsets_shift
+                    onsets_shift = x_feature[:,1:] - x_feature[:,:-1]
+                    x_encoded = torch.zeros(x.shape[0], x.shape[1], 1).float().to(x.device)
+                    x_encoded[:,1:,0] = onsets_shift
                 elif onset_encoding == 'absolute-onehot':
                     pass
                 elif onset_encoding == 'shift-onehot':
                     pass
 
-                x_list.append(onsets_encoded)
-
             # duration
             elif feature == 'duration':
-                duration = x[:,:,feature2idx['duration']]
-
                 if duration_encoding == 'raw':
-                    duration_encoding = duration.float().unsqueeze(2)
+                    x_encoded = x_feature.float().unsqueeze(2)
                 elif duration_encoding == 'onehot':
                     pass
 
-                x_list.append(duration_encoding)
-
             # velocity
             elif feature == 'velocity':
-                pass
+                x_encoded = x_feature.float().unsqueeze(2) / 127.0
+
+            x_list.append(x_encoded)
 
         x = torch.cat(x_list, dim=2)
         return x
 
     @staticmethod
-    def get_encoding_in_features(features, onset_encoding, duration_encoding):
+    def get_encoding_in_features(features, pitch_encoding, onset_encoding, duration_encoding):
         """
         Get encoding in features.
 
         Args:
             features (list): List of features.
+            pitch_encoding (str): Encoding of pitch features. Select one from ['midi', 'chroma'].
             onset_encoding (str): Encoding of onset features. Select one from ['absolute-raw', 'shift-raw',
                             'absolute-onehot', 'shift-onehot'].
             duration_encoding (str): Encoding of duration features. Select one from ['raw', 'onehot'].
@@ -338,7 +345,10 @@ class ModelUtils():
         for feature in features:
             # pitch
             if feature == 'pitch':
-                in_features += 128
+                if pitch_encoding == 'midi':
+                    in_features += 128
+                elif pitch_encoding == 'chroma':
+                    in_features += 12
 
             # onset
             elif feature == 'onset':
@@ -360,6 +370,6 @@ class ModelUtils():
 
             # velocity
             elif feature == 'velocity':
-                pass
+                in_features += 1
 
         return in_features

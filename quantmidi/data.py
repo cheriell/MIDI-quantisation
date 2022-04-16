@@ -71,7 +71,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         if self.split == 'train':
-            return batch_size * 4 * 500     # constantly update 500 steps per epoch
+            return batch_size * 4 * 200     # constantly update 200 steps per epoch
                                             # not related to training dataset size
         else:
             return 4 * len(self.metadata)  # valid dataset size
