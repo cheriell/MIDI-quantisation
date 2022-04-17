@@ -116,8 +116,8 @@ class QuantMIDIModel(pl.LightningModule):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             monitor='val_f1',
             mode='max',
-            save_top_k=5,
-            filename='{epoch}-{val_f1:.4f}.ckpt',
+            save_top_k=10,
+            filename='{epoch}-{val_f1:.4f}',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(
@@ -125,7 +125,7 @@ class QuantMIDIModel(pl.LightningModule):
             patience=500,
             mode='max',
         )
-        return [checkpoint_callback, earlystop_callback]
+        return [checkpoint_callback]#, earlystop_callback]
 
 
 class QuantMIDISequenceModel(nn.Module):

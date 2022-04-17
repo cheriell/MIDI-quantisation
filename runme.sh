@@ -23,17 +23,19 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training ===============
 echo ">>> Training the model"
 
-experiment_name="input_encodings"
-run_name="midi_pitch_sequence_validation"
+experiment_name="input_encoding_experiments"
+run_name="chroma_pitch"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
-pitch_encoding="midi"
+pitch_encoding="chroma"
 onset_encoding="shift-raw"
 duration_encoding="raw"
 
 workers="8"
 gpus="4"
+
+resume_from_checkpoint="../workspace/MIDI-quantisation/mlruns/3/ef9bea67064c48c9a737c38145ae68a4/checkpoints/last.ckpt"
 
 python3 quantmidi/train.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
@@ -47,5 +49,6 @@ python3 quantmidi/train.py \
     --duration_encoding $duration_encoding \
     --workers $workers \
     --gpus $gpus \
+    # --resume_from_checkpoint $resume_from_checkpoint \
     --verbose
 

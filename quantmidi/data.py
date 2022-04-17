@@ -82,9 +82,10 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         # get row
         if self.split == 'train':
             piece_id = random.choice(list(self.piece2row.keys()))   # random sampling by piece
+            row_id = random.choice(self.piece2row[piece_id])
         elif self.split == 'valid':
             piece_id = self.pieces[idx // batch_size]    # by istinct pieces in validation set
-        row_id = random.choice(self.piece2row[piece_id])
+            row_id = self.piece2row[piece_id][idx % batch_size % len(self.piece2row[piece_id])]
         row = self.metadata.iloc[row_id]
 
         # get feature
@@ -101,8 +102,12 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             # list of tuples (pitch, onset, duration, velocity) in torch tensor
             # randomly select a segment by max_length
             if len(note_sequence) > max_length:
-                start_idx = random.randint(0, len(note_sequence) - max_length)
-                end_idx = start_idx + max_length
+                if self.split == 'train':
+                    start_idx = random.randint(0, len(note_sequence) - max_length)
+                    end_idx = start_idx + max_length
+                elif self.split == 'valid':
+                    start_idx = 0
+                    end_idx = max_length  # validate on the segment starting with the first note
             else:
                 start_idx, end_idx = 0, len(note_sequence)
             note_sequence = note_sequence[start_idx:end_idx]
