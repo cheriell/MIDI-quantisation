@@ -24,7 +24,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 echo ">>> Training the model"
 
 experiment_name="input_encodings"
-run_name="midi_pitch_stepSize=1000"
+run_name="midi_pitch_sequence_validation"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"

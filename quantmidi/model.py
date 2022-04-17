@@ -107,7 +107,7 @@ class QuantMIDIModel(pl.LightningModule):
         )
         scheduler_lrdecay = torch.optim.lr_scheduler.StepLR(
             optimizer,
-            step_size=1000,
+            step_size=10000,
             gamma=0.1,
         )
         return [optimizer], [scheduler_lrdecay]
@@ -117,7 +117,7 @@ class QuantMIDIModel(pl.LightningModule):
             monitor='val_f1',
             mode='max',
             save_top_k=5,
-            filename='{epoch}-{val_loss:.4f}.ckpt',
+            filename='{epoch}-{val_f1:.4f}.ckpt',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(

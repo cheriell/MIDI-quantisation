@@ -24,28 +24,28 @@ class QuantMIDIDataModule(LightningDataModule):
         self.workers = workers
 
     def train_dataloader(self):
-        return self.get_dataloader(split='train')
-
-    def val_dataloader(self):
-        return self.get_dataloader(split='valid')
-
-    def test_dataloader(self):
-        return self.get_dataloader(split='test')
-
-    def get_dataloader(self, split):
-
-        dataset = QuantMIDIDataset(self.feature_folder, split, self.model_type)
+        dataset = QuantMIDIDataset(self.feature_folder, 'train', self.model_type)
         sampler = torch.utils.data.sampler.RandomSampler(dataset)
-        data_loader = torch.utils.data.dataloader.DataLoader(
+        train_loader = torch.utils.data.dataloader.DataLoader(
             dataset,
             batch_size=batch_size,
             sampler=sampler,
             num_workers=self.workers,
             drop_last=True
         )
+        return train_loader
 
-        return data_loader
-
+    def val_dataloader(self):
+        dataset = QuantMIDIDataset(self.feature_folder, 'valid', self.model_type)
+        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
+        val_loader = torch.utils.data.dataloader.DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=self.workers,
+            drop_last=True
+        )
+        return val_loader
 
 class QuantMIDIDataset(torch.utils.data.Dataset):
 
@@ -74,11 +74,16 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             return batch_size * 4 * 200     # constantly update 200 steps per epoch
                                             # not related to training dataset size
         else:
-            return 4 * len(self.metadata)  # valid dataset size
+            # by istinct pieces in validation set
+            self.pieces = list(self.piece2row.keys())
+            return batch_size * len(self.piece2row)  # valid dataset size
 
     def __getitem__(self, idx):
-        # random sampling by piece
-        piece_id = random.choice(list(self.piece2row.keys()))
+        # get row
+        if self.split == 'train':
+            piece_id = random.choice(list(self.piece2row.keys()))   # random sampling by piece
+        elif self.split == 'valid':
+            piece_id = self.pieces[idx // 8]    # by istinct pieces in validation set
         row_id = random.choice(self.piece2row[piece_id])
         row = self.metadata.iloc[row_id]
 
