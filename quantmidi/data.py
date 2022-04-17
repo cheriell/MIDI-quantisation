@@ -83,7 +83,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         if self.split == 'train':
             piece_id = random.choice(list(self.piece2row.keys()))   # random sampling by piece
         elif self.split == 'valid':
-            piece_id = self.pieces[idx // 8]    # by istinct pieces in validation set
+            piece_id = self.pieces[idx // batch_size]    # by istinct pieces in validation set
         row_id = random.choice(self.piece2row[piece_id])
         row = self.metadata.iloc[row_id]
 
