@@ -23,13 +23,13 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training ===============
 echo ">>> Training the model"
 
-experiment_name="input_encoding_experiments"
-run_name="chroma_pitch"
+experiment_name="Default"
+run_name="shift_onehot_onset"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
-pitch_encoding="chroma"
-onset_encoding="shift-raw"
+pitch_encoding="midi"
+onset_encoding="shift-onehot"
 duration_encoding="raw"
 
 workers="8"
@@ -50,5 +50,5 @@ python3 quantmidi/train.py \
     --workers $workers \
     --gpus $gpus \
     # --resume_from_checkpoint $resume_from_checkpoint \
-    --verbose
+    # --verbose
 

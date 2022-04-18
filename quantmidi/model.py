@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from quantmidi.data import resolution
+
 learning_rate = 1e-3
 
 class QuantMIDIModel(pl.LightningModule):
@@ -298,15 +300,39 @@ class ModelUtils():
             # onset
             elif feature == 'onset':
                 if onset_encoding == 'absolute-raw':
+                    # restart from 0s
+                    x_feature = x_feature - x_feature[:,0:1].clone()
                     x_encoded = x_feature.float().unsqueeze(2)
+
                 elif onset_encoding == 'shift-raw':
                     onsets_shift = x_feature[:,1:] - x_feature[:,:-1]
-                    x_encoded = torch.zeros(x.shape[0], x.shape[1], 1).float().to(x.device)
+                    print(onsets_shift.min(), onsets_shift.max()); input()
+                    # set first onset shift to 0
+                    x_encoded = torch.zeros(x.shape[0], x.shape[1], 1).float().to(x.device)  
                     x_encoded[:,1:,0] = onsets_shift
+
                 elif onset_encoding == 'absolute-onehot':
-                    pass
+                    # restart from 0s
+                    x_feature = x_feature - x_feature[:,0:1].clone()
+                    # restart every 20s
+                    x_feature = x_feature % 20.0
+                    # to one hot index
+                    x_feature = torch.round(x_feature / resolution).long()
+                    # to one hot
+                    x_encoded = F.one_hot(x_feature, int(20.0 / resolution) + 1).float()
+                    
                 elif onset_encoding == 'shift-onehot':
-                    pass
+                    onsets_shift_raw = x_feature[:,1:] - x_feature[:,:-1]
+                    # set first onset shift to 0
+                    onsets_shift = torch.zeros(x.shape[0], x.shape[1]).float().to(x.device)
+                    onsets_shift[:,1:] = onsets_shift_raw
+                    # maximum filter - set maximum onset shift to 4s
+                    onsets_shift_filted = onsets_shift.clone()
+                    onsets_shift_filted[onsets_shift > 4.0] = 4.0
+                    # to one hot index
+                    onsets_shift_idx = torch.round(onsets_shift_filted / resolution).long()
+                    # to one hot
+                    x_encoded = F.one_hot(onsets_shift_idx, int(4.0 / resolution) + 1).float()
 
             # duration
             elif feature == 'duration':
@@ -357,9 +383,9 @@ class ModelUtils():
                 elif onset_encoding == 'shift-raw':
                     in_features += 1
                 elif onset_encoding == 'absolute-onehot':
-                    pass
+                    in_features += int(20.0 / resolution) + 1  # maximum 20s
                 elif onset_encoding == 'shift-onehot':
-                    pass
+                    in_features += int(4.0 / resolution) + 1   # maximum 4s
 
             # duration
             elif feature == 'duration':
