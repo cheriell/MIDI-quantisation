@@ -74,11 +74,12 @@ class QuantMIDIModel(pl.LightningModule):
         loss = F.binary_cross_entropy(y_hat, y)
 
         # metrics
+        accs, precs, recs, f1s = 0, 0, 0, 0
         for i in range(x.shape[0]):
             y_hat_i = torch.round(y_hat[i, :length[i]])
             y_i = y[i, :length[i]]
 
-            acc = (y_hat_i == y_i).float().mean()
+            accs += (y_hat_i == y_i).float().mean()
             TP = torch.logical_and(y_hat_i==1, y_i==1).float().sum()
             FP = torch.logical_and(y_hat_i==1, y_i==0).float().sum()
             FN = torch.logical_and(y_hat_i==0, y_i==1).float().sum()
@@ -86,18 +87,68 @@ class QuantMIDIModel(pl.LightningModule):
             p = TP / (TP + FP + np.finfo(float).eps)
             r = TP / (TP + FN + np.finfo(float).eps)
             f1 = 2 * p * r / (p + r + np.finfo(float).eps)
+            precs += p
+            recs += r
+            f1s += f1
 
         # log
         logs = {
             'val_loss': loss,
-            'val_acc': acc,
-            'val_p': p,
-            'val_r': r,
-            'val_f1': f1,
+            'val_acc': accs / x.shape[0],
+            'val_p': precs / x.shape[0],
+            'val_r': recs / x.shape[0],
+            'val_f1': f1s / x.shape[0],
         }
         self.log_dict(logs, prog_bar=True)
 
         return {'val_loss': loss, 'logs': logs}
+
+    def test_step(self, batch, batch_idx):
+        # data
+        x, y, length = batch
+        x = x.float()
+        y = y.float()
+
+        # predict
+        x = ModelUtils.input_feature_ablation(x, self.features)
+        y_hat = self.forward(x)
+
+        # mask out the padded part
+        for i in range(y_hat.shape[0]):
+            y_hat[i, length[i]:] = 0
+
+        # compute loss
+        loss = F.binary_cross_entropy(y_hat, y)
+
+        # metrics
+        accs, precs, recs, f1s = 0, 0, 0, 0
+        for i in range(x.shape[0]):
+            y_hat_i = torch.round(y_hat[i, :length[i]])
+            y_i = y[i, :length[i]]
+
+            accs += (y_hat_i == y_i).float().mean()
+            TP = torch.logical_and(y_hat_i==1, y_i==1).float().sum()
+            FP = torch.logical_and(y_hat_i==1, y_i==0).float().sum()
+            FN = torch.logical_and(y_hat_i==0, y_i==1).float().sum()
+
+            p = TP / (TP + FP + np.finfo(float).eps)
+            r = TP / (TP + FN + np.finfo(float).eps)
+            f1 = 2 * p * r / (p + r + np.finfo(float).eps)
+            precs += p
+            recs += r
+            f1s += f1
+
+        # log
+        logs = {
+            'test_loss': loss,
+            'test_acc': accs / x.shape[0],
+            'test_p': precs / x.shape[0],
+            'test_r': recs / x.shape[0],
+            'test_f1': f1s / x.shape[0],
+        }
+        self.log_dict(logs, prog_bar=True)
+
+        return {'test_loss': loss, 'logs': logs}
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -306,7 +357,6 @@ class ModelUtils():
 
                 elif onset_encoding == 'shift-raw':
                     onsets_shift = x_feature[:,1:] - x_feature[:,:-1]
-                    print(onsets_shift.min(), onsets_shift.max()); input()
                     # set first onset shift to 0
                     x_encoded = torch.zeros(x.shape[0], x.shape[1], 1).float().to(x.device)  
                     x_encoded[:,1:,0] = onsets_shift

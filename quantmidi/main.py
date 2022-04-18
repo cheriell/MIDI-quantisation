@@ -30,6 +30,9 @@ def main():
     # experiment settings
     parser.add_argument('--experiment_name', type=str, help='Name of the experiment', default='full-training')
     parser.add_argument('--run_name', type=str, help='Name of the run', default='run-0')
+    
+    parser.add_argument('--option', type=str, help='Options for the experiment, select from [train, test, \
+                        evaluate]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
                         [pianoroll]', default='note_sequence')
 
@@ -62,14 +65,12 @@ def main():
         raise ValueError('Invalid model type: {}'.format(args.model_type))
     # workers
     # verbose
-
-    train(args)
-
-def train(args):
-
+    
+    # ========= create workspace =========
     feature_folder = str(Path(args.workspace, 'features'))
     tracking_uri = str(Path(args.workspace, 'mlruns'))
 
+    # ========= create dataset, model, logger =========
     datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
                                     workers=args.workers)
     model = QuantMIDIModel(
@@ -79,7 +80,6 @@ def train(args):
         onset_encoding=args.onset_encoding,
         duration_encoding=args.duration_encoding,
     )
-
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,
         tracking_uri=tracking_uri,
@@ -93,6 +93,7 @@ def train(args):
         },
     )
 
+    # ========= create trainer =========
     trainer = pl.Trainer(
         default_root_dir=tracking_uri,
         logger=logger,
@@ -101,7 +102,12 @@ def train(args):
         gpus=args.gpus,
         resume_from_checkpoint=args.resume_from_checkpoint,
     )
-    trainer.fit(model, datamodule=datamodule)
+
+    # ========= train/test =========
+    if args.option == 'train':
+        trainer.fit(model, datamodule=datamodule)
+    elif args.option == 'test':
+        trainer.test(model, datamodule=datamodule)
 
 if __name__ == '__main__':
     main()

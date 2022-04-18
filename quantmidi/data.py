@@ -47,6 +47,17 @@ class QuantMIDIDataModule(LightningDataModule):
         )
         return val_loader
 
+    def test_dataloader(self):
+        dataset = QuantMIDIDataModule(self.feature_folder, 'test', self.model_type)
+        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
+        test_loader = torch.utils.data.dataloader.DataLoader(
+            dataset,
+            batch_size=1,
+            sampler=sampler,
+            num_workers=1,
+            drop_last=False
+        )
+
 class QuantMIDIDataset(torch.utils.data.Dataset):
 
     def __init__(self, feature_folder, split, model_type):
@@ -73,10 +84,12 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         if self.split == 'train':
             return batch_size * 4 * 200     # constantly update 200 steps per epoch
                                             # not related to training dataset size
-        else:
+        elif self.split == 'valid':
             # by istinct pieces in validation set
             self.pieces = list(self.piece2row.keys())
             return batch_size * len(self.piece2row)  # valid dataset size
+        elif self.split == 'test':
+            return len(self.metadata)
 
     def __getitem__(self, idx):
         # get row
@@ -86,6 +99,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         elif self.split == 'valid':
             piece_id = self.pieces[idx // batch_size]    # by istinct pieces in validation set
             row_id = self.piece2row[piece_id][idx % batch_size % len(self.piece2row[piece_id])]
+        elif self.split == 'test':
+            row_id = idx
         row = self.metadata.iloc[row_id]
 
         # get feature
@@ -106,8 +121,9 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                     start_idx = random.randint(0, len(note_sequence) - max_length)
                     end_idx = start_idx + max_length
                 elif self.split == 'valid':
-                    start_idx = 0
-                    end_idx = max_length  # validate on the segment starting with the first note
+                    start_idx, end_idx = 0, max_length  # validate on the segment starting with the first note
+                elif self.split == 'test':
+                    start_idx, end_idx = 0, len(note_sequence)  # test on the whole note sequence
             else:
                 start_idx, end_idx = 0, len(note_sequence)
             note_sequence = note_sequence[start_idx:end_idx]
