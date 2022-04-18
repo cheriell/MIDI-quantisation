@@ -329,6 +329,8 @@ class ModelUtils():
                     # maximum filter - set maximum onset shift to 4s
                     onsets_shift_filted = onsets_shift.clone()
                     onsets_shift_filted[onsets_shift > 4.0] = 4.0
+                    # remove negative values introduced by zero padding
+                    onsets_shift_filted[onsets_shift < 0.0] = 0.0
                     # to one hot index
                     onsets_shift_idx = torch.round(onsets_shift_filted / resolution).long()
                     # to one hot
