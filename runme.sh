@@ -23,10 +23,10 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training/Testing ===============
 echo ">>> Training/Testing the model"
 
-experiment_name="input_encoding_experiments"
+experiment_name="Default"
 run_name="pitch_midi"
 
-option="train"
+option="test"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
@@ -34,10 +34,10 @@ pitch_encoding="midi"
 onset_encoding="shift-raw"
 duration_encoding="raw"
 
-workers="8"
-gpus="4"
+workers="1"
+gpus="1"
 
-resume_from_checkpoint="../workspace/MIDI-quantisation/mlruns/1/5ce0d82bbadf4c219cc06fe67d6e2efe/checkpoints/epoch=159-val_f1=0.8569.ckpt"
+model_checkpoint="../workspace/MIDI-quantisation/mlruns/1/f968ce6ae5dd494db3aa692a7cac669c/checkpoints/last.ckpt"
 
 python3 quantmidi/main.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
@@ -52,6 +52,6 @@ python3 quantmidi/main.py \
     --duration_encoding $duration_encoding \
     --workers $workers \
     --gpus $gpus \
-    # --resume_from_checkpoint $resume_from_checkpoint \
+    --model_checkpoint $model_checkpoint \
     # --verbose
 

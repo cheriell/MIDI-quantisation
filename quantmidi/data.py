@@ -48,15 +48,16 @@ class QuantMIDIDataModule(LightningDataModule):
         return val_loader
 
     def test_dataloader(self):
-        dataset = QuantMIDIDataModule(self.feature_folder, 'test', self.model_type)
+        dataset = QuantMIDIDataset(self.feature_folder, 'test', self.model_type)
         sampler = torch.utils.data.sampler.SequentialSampler(dataset)
         test_loader = torch.utils.data.dataloader.DataLoader(
             dataset,
             batch_size=1,
             sampler=sampler,
-            num_workers=1,
+            num_workers=0,
             drop_last=False
         )
+        return test_loader
 
 class QuantMIDIDataset(torch.utils.data.Dataset):
 
