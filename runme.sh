@@ -24,20 +24,20 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 echo ">>> Training/Testing the model"
 
 experiment_name="Default"
-run_name="onset_absolute-raw"
+run_name="onset_shift-onehot"
 
 option="test"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
-pitch_encoding="chroma"
-onset_encoding="shift-raw"
+pitch_encoding="midi"
+onset_encoding="shift-onehot"
 duration_encoding="raw"
 
 workers="8"
 gpus="4"
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/1/1d11a259ebe348baa5acdf3b454b6474/checkpoints/epoch=148-val_f1=0.8632.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/1/0a935d7a3e6248bdbe64dab869608982/checkpoints/epoch=193-val_f1=0.8957.ckpt"
 
 python3 quantmidi/main.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \

@@ -18,7 +18,7 @@ def input_encoding_comparison_plot():
     # ========= data =========
     f1s = [
         [87.8, 87.3],
-        [80.0, 87.8, 80.0, 80.0],
+        [80.0, 87.8, 80.0, 91.3],
         [80.0, 80.0]
     ]  # f1-scores for pitch, onset, duration encodings
     labels = [
