@@ -99,7 +99,7 @@ def main():
         logger=logger,
         log_every_n_steps=50,
         reload_dataloaders_every_n_epochs=True,
-        gpus=args.gpus,
+        gpus=args.gpus if args.option == 'train' else 1,
         # resume_from_checkpoint=args.model_checkpoint,
     )
 

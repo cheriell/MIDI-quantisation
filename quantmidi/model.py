@@ -8,6 +8,7 @@ import numpy as np
 from quantmidi.data import resolution
 
 learning_rate = 1e-3
+dropout = 0.15
 
 class QuantMIDIModel(pl.LightningModule):
     def __init__(self, 
@@ -169,7 +170,7 @@ class QuantMIDIModel(pl.LightningModule):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             monitor='val_f1',
             mode='max',
-            save_top_k=10,
+            save_top_k=9,
             filename='{epoch}-{val_f1:.4f}',
             save_last=True,
         )
@@ -190,7 +191,7 @@ class QuantMIDISequenceModel(nn.Module):
         hidden_size=512,
         kernel_size=9,
         gru_layers=2,
-        dropout=0.15,
+        dropout=dropout,
     ):
         """
         Model for quantization of MIDI note sequences.
