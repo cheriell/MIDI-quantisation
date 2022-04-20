@@ -19,7 +19,7 @@ def input_encoding_comparison_plot():
     f1s = [
         [87.8, 87.3],
         [70.0, 87.8, 79.3, 91.3],
-        [91.3, 70.0]
+        [91.3, 89.1]
     ]  # f1-scores for pitch, onset, duration encodings
     labels = [
         ['midi', 'chroma'],
