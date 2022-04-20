@@ -392,7 +392,13 @@ class ModelUtils():
                 if duration_encoding == 'raw':
                     x_encoded = x_feature.float().unsqueeze(2)
                 elif duration_encoding == 'onehot':
-                    pass
+                    # maximum filter - set maximum duration to 4s
+                    durations_filted = x_feature.clone()
+                    durations_filted[durations_filted > 4.0] = 4.0
+                    # to one hot index
+                    durations_idx = torch.round(durations_filted / resolution).long()
+                    # to one hot
+                    x_encoded = F.one_hot(durations_idx, int(4.0 / resolution) + 1).float()
 
             # velocity
             elif feature == 'velocity':
@@ -445,7 +451,7 @@ class ModelUtils():
                 if duration_encoding == 'raw':
                     in_features += 1
                 elif duration_encoding == 'onehot':
-                    pass
+                    in_features += int(4.0 / resolution) + 1   # maximum 4s
 
             # velocity
             elif feature == 'velocity':

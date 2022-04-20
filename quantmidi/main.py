@@ -85,6 +85,7 @@ def main():
         tracking_uri=tracking_uri,
         run_name=args.run_name,
         tags={
+            'option': args.option,
             'model_type': args.model_type,
             'features': ','.join(args.features),
             'pitch_encoding': args.pitch_encoding,

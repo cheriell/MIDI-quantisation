@@ -23,16 +23,16 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training/Testing ===============
 echo ">>> Training/Testing the model"
 
-experiment_name="Default"
-run_name="onset_absolute-onehot"
+experiment_name="input_encoding_experiments"
+run_name="duration-onehot"
 
-option="test"
+option="train"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
 pitch_encoding="midi"
-onset_encoding="absolute-onehot"
-duration_encoding="raw"
+onset_encoding="shift-onehot"
+duration_encoding="onehot"
 
 workers="8"
 gpus="4"
