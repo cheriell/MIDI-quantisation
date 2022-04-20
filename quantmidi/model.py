@@ -176,7 +176,7 @@ class QuantMIDIModel(pl.LightningModule):
         )
         earlystop_callback = pl.callbacks.EarlyStopping(
             monitor='val_f1',
-            patience=500,
+            patience=200,
             mode='max',
         )
         return [checkpoint_callback]#, earlystop_callback]
