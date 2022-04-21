@@ -10,8 +10,6 @@ Path.mkdir(figures_dir, exist_ok=True)
 def main():
     print('Generate plots')
 
-    input_encoding_comparison_plot()
-
 def input_encoding_comparison_plot():
     print('Input encoding comparison plot')
 

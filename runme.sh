@@ -22,14 +22,14 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="input_encoding_experiments"
+experiment_name="Default"
 
-option="train"
+option="test"
 model_type="note_sequence"
 
 features="pitch onset duration velocity"
 pitch_encoding="midi"  # "midi" or "chroma" | best: "midi"
-onset_encoding="shift-raw"  # "shift-onehot", "shift-raw", "absolute-onehot" or "absolute-raw" | best: "shift-onehot"
+onset_encoding="shift-onehot"  # "shift-onehot", "shift-raw", "absolute-onehot" or "absolute-raw" | best: "shift-onehot"
 duration_encoding="onehot"  # "raw" or "onehot" | best: "raw"
 run_name=$pitch_encoding"."$onset_encoding"."$duration_encoding
 
