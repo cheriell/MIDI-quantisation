@@ -170,7 +170,7 @@ class QuantMIDIModel(pl.LightningModule):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
             monitor='val_f1',
             mode='max',
-            save_top_k=9,
+            save_top_k=3,
             filename='{epoch}-{val_f1:.4f}',
             save_last=True,
         )
