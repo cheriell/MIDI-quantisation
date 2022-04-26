@@ -27,16 +27,18 @@ experiment_name="Default"
 option="test"
 model_type="note_sequence"
 
-features="pitch onset duration velocity"
+features="onset duration velocity"
 pitch_encoding="midi"  # "midi" or "chroma" | best: "midi"
 onset_encoding="shift-onehot"  # "shift-onehot", "shift-raw", "absolute-onehot" or "absolute-raw" | best: "shift-onehot"
-duration_encoding="onehot"  # "raw" or "onehot" | best: "raw"
-run_name=$pitch_encoding"."$onset_encoding"."$duration_encoding
+duration_encoding="raw"  # "raw" or "onehot" | best: "raw"
+
+# run_name=$pitch_encoding"."$onset_encoding"."$duration_encoding  # input_encoding_experiments run_name
+run_name="no_pitch"  # input_ablation_study run_name
 
 workers="8"
 gpus="4"
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/1/bef12d1ffcac4e10a36bddfb945d3aaa/checkpoints/epoch=217-val_f1=0.8862.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/2/3b46be0fb292454b9fc8ee649a2cfee5/checkpoints/epoch=107-val_f1=0.8772.ckpt"
 
 echo ">>> "$option" the model"
 
