@@ -34,11 +34,12 @@ def main():
     parser.add_argument('--option', type=str, help='Options for the experiment, select from [train, test, \
                         evaluate]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
-                        [pianoroll]', default='note_sequence')
+                        [baseline]', default='note_sequence')
 
     # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
-                        more from [pitch, onset, duration, velocity]', default=['onset', 'duration'])
+                        more from [pitch, onset, duration, velocity]', default=['pitch', 'onset', 'duration', \
+                        'velocity'])
     parser.add_argument('--pitch_encoding', type=str, help='Pitch encoding, select from [midi, chroma]', \
                         default='midi')
     parser.add_argument('--onset_encoding', type=str, help='Encoding of onset features. Select one from \
@@ -61,8 +62,10 @@ def main():
     # workspace
     # experiment_name
     # model_type
-    if args.model_type not in ['note_sequence', 'pianoroll']:
+    if args.model_type not in ['note_sequence', 'baseline']:
         raise ValueError('Invalid model type: {}'.format(args.model_type))
+    if args.model_type == 'baseline':
+        assert args.features == ['pitch', 'onset', 'duration', 'velocity'], "Invalid features for baseline model"
     # workers
     # verbose
     

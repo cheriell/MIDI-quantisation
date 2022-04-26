@@ -21,14 +21,16 @@ class QuantMIDIDataModule(LightningDataModule):
         super().__init__()
         self.feature_folder = feature_folder
         self.model_type = model_type
-        self.workers = workers
+
+        self.workers = workers if model_type == 'note_sequence' else 0
+        self.bs = batch_size if model_type == 'note_sequence' else 1
 
     def train_dataloader(self):
         dataset = QuantMIDIDataset(self.feature_folder, 'train', self.model_type)
         sampler = torch.utils.data.sampler.RandomSampler(dataset)
         train_loader = torch.utils.data.dataloader.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=self.bs,
             sampler=sampler,
             num_workers=self.workers,
             drop_last=True
@@ -40,7 +42,7 @@ class QuantMIDIDataModule(LightningDataModule):
         sampler = torch.utils.data.sampler.SequentialSampler(dataset)
         val_loader = torch.utils.data.dataloader.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=self.bs,
             sampler=sampler,
             num_workers=self.workers,
             drop_last=True
@@ -83,12 +85,20 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         if self.split == 'train':
-            return batch_size * 4 * 200     # constantly update 200 steps per epoch
-                                            # not related to training dataset size
+            if self.model_type == 'note_sequence':
+                return batch_size * 4 * 200     # constantly update 200 steps per epoch
+                                                # not related to training dataset size
+            elif self.model_type == 'baseline':
+                return 4 * 200
+
         elif self.split == 'valid':
             # by istinct pieces in validation set
             self.pieces = list(self.piece2row.keys())
-            return batch_size * len(self.piece2row)  # valid dataset size
+            if self.model_type == 'note_sequence':
+                return batch_size * len(self.piece2row)  # valid dataset size
+            elif self.model_type == 'baseline':
+                return 4 * len(self.piece2row)
+
         elif self.split == 'test':
             return len(self.metadata)
 
@@ -153,13 +163,22 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             return note_sequence, beat_probs, length
 
-        def sample_segment_pianoroll(note_sequence, beats):
-            return
+        def sample_segment_baseline(note_sequence, beats):
+            # ========== get model input ==========
+            # still note sequence, but do not segment by max_length this time.
+            # convert to pianoroll in model forward - it's faster to use the GPU.
+            # forward note_sequence directly to model input.
+
+            # =========== get model output ===========
+            # list of beat probs in torch tensor.
+            beat_probs, length = DataUtils.get_beat_activation(note_sequence, beats)
+
+            return note_sequence, beat_probs, length
 
         if self.model_type == 'note_sequence':
             return sample_segment_note_sequence(note_sequence, beats)
-        elif self.model_type == 'pianoroll':
-            return sample_segment_pianoroll(note_sequence, beats)
+        elif self.model_type == 'baseline':
+            return sample_segment_baseline(note_sequence, beats)
 
 class DataAugmentation():
     def __init__(self, 
@@ -285,3 +304,16 @@ class DataUtils():
                 return 1
         else:
             return 1
+
+    @staticmethod
+    def get_beat_activation(note_sequence, beats):
+        """
+        Get beat activation from beat sequence.
+        """
+        beat_activation_length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
+        beat_activation = torch.zeros(beat_activation_length).float()
+        for beat in beats:
+            left = int(max(0, torch.round(beat - tolerance)))
+            right = int(min(beat_activation_length, torch.round(beat + tolerance)))
+            beat_activation[left:right] = 1.0
+        return beat_activation, beat_activation_length

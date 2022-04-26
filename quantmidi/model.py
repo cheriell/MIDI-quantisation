@@ -29,7 +29,7 @@ class QuantMIDIModel(pl.LightningModule):
                 onset_encoding=onset_encoding,
                 duration_encoding=duration_encoding,
             )
-        elif model_type == 'pianoroll':
+        elif model_type == 'baseline':
             self.model = QuantMIDIBaselineModel()
         
     def forward(self, x):
@@ -289,11 +289,140 @@ class QuantMIDISequenceModel(nn.Module):
 class QuantMIDIBaselineModel(nn.Module):
     def __init__(self):
         super().__init__()
-        pass
+        
+        # ========== ConvBlock frontend ==========
+        self.convs = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1,
+                out_channels=20,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(0, 1),
+                bias=False,
+            ),
+            nn.BatchNorm2d(20),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+
+            nn.Conv2d(
+                in_channels=20,
+                out_channels=20,
+                kernel_size=(20, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+                bias=False,
+            ),
+            nn.BatchNorm2d(20),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+
+            nn.Conv2d(
+                in_channels=20,
+                out_channels=20,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(0, 1),
+                bias=False,
+            ),
+            nn.BatchNorm2d(20),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+        )
+
+        # ========== TCN block 11 alyers, 1*2 dilation, 20 channels ==========
+        self.tcn_layers = 11
+        self.tcns = nn.ModuleList()
+
+        for i in range(self.tcn_layers):
+            tcn = TCNLayer(
+                in_channels=20,
+                out_channels=20,
+                kernel_size=5,
+                dilation=2 ** i,
+                p_dropout=dropout
+            )
+            self.tcns.append(tcn)
+
+        self.relu = nn.ELU()
+
+        # ========== Linear output layer and sigmoid activation ==========
+        self.out_layer = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(20, 2),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
+        # x.shape = (batch_size, note_sequence_length, len(features)), batch_size = 1
+
+        # ======== get piano roll ==========
+        x = ModelUtils.get_pianoroll_from_batch_data(x)  # (1, 128, pr_length)
+        x = x.unsqueeze(1)  # (1, 1, 128, pr_length)
+
+        # ======== ConvBlock frontend ==========
+        x = self.convs(x)  # (1, 20, 1, pr_length)
+        x = x.squeeze(2)  # (1, 20, pr_length)
+        
+        # ======== TCN block 11 alyers, 1*2 dilation, 20 channels ==========
+        for i in range(self.tcn_layers):
+            x, x_skip = self.tcns[i](x)  # (1, 20, pr_length)
+        x = self.relu(x)  # (1, 20, pr_length)
+        x = x.transpose(1, 2)  # (1, pr_length, 20)
+
+        # ======== Linear output layer and sigmoid activation ==========
+        x = self.out_layer(x)  # (1, pr_length, 2)
+        x = x[:,:,0]  # (1, pr_length)
+
         return x
 
+class TCNLayer(nn.Module):
+    def __init__(
+        self, 
+        in_channels,
+        out_channels,
+        kernel_size,
+        dilation,
+        p_dropout
+    ):
+        super().__init__()
+
+        self.conv1_dilated = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding=dilation * (kernel_size - 1) // 2,
+            dilation=dilation,
+            groups=in_channels
+        )
+        self.conv2_dilated = nn.Conv1d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding=dilation * 2 * (kernel_size - 1) // 2,
+            dilation=dilation * 2,
+            groups=in_channels
+        )
+        self.relu = nn.ELU()
+        self.bn = nn.BatchNorm1d(out_channels*2)
+        self.spatial_dropout = nn.Dropout2d(p_dropout)
+        
+        self.conv_res = nn.Conv1d(in_channels, out_channels, 1)
+        self.conv_reshape = nn.Conv1d(out_channels*2, out_channels, 1)
+
+    def forward(self, x):
+        x1 = self.conv1_dilated(x)
+        x2 = self.conv2_dilated(x)
+        x_concat = torch.cat([x1, x2], dim=1)
+        x_concat = self.spatial_dropout(self.bn(self.relu(x_concat)))
+        x_skip = self.conv_reshape(x_concat)  # forward to skip connection
+
+        x_res = self.conv_res(x)
+        x_out = x_res + x_skip  # forward to next TCN layer
+
+        return x_out, x_skip
 
 class ModelUtils():
 
@@ -458,3 +587,19 @@ class ModelUtils():
                 in_features += 1
 
         return in_features
+
+    @staticmethod
+    def get_pianoroll_from_batch_data(x):
+        # x.shape = (batch_size, length, len(features)), batch_size = 1
+        assert x.shape[0] == 1, 'Batch size must be 1.'
+        assert x.shape[2] == 4, 'Number of features must be 4.'
+
+        pr_length = (torch.max(x[:,:,1] + x[:,:,2]) * (1 / resolution) + 1).long()
+        pr = torch.zeros(1, 128, pr_length).float().to(x.device)
+
+        for i in range(x.shape[1]):
+            start = torch.round(x[0,i,1] * (1 / resolution)).long()
+            end = torch.round((x[0,i,1] + x[0,i,2]) * (1 / resolution)).long()
+            pr[0,x[0,i,0].long(),start:end] = x[0,i,3] / 127.0
+
+        return pr

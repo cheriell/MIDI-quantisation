@@ -24,19 +24,20 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 experiment_name="Default"
 
-option="test"
-model_type="note_sequence"
+option="train"
+model_type="baseline"  # "note_sequence" or "baseline"  | default: "note_sequence"
 
-features="onset duration velocity"
+features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
 pitch_encoding="midi"  # "midi" or "chroma" | best: "midi"
 onset_encoding="shift-onehot"  # "shift-onehot", "shift-raw", "absolute-onehot" or "absolute-raw" | best: "shift-onehot"
 duration_encoding="raw"  # "raw" or "onehot" | best: "raw"
 
 # run_name=$pitch_encoding"."$onset_encoding"."$duration_encoding  # input_encoding_experiments run_name
-run_name="no_pitch"  # input_ablation_study run_name
+# run_name="no_duration"  # input_ablation_study run_name
+run_name='baseline_model'  # model_type=baseline run_name
 
-workers="8"
-gpus="4"
+workers="0"  # default: "8", debug: "0"
+gpus="4"  # default: "4", debug: "1"
 
 model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/2/3b46be0fb292454b9fc8ee649a2cfee5/checkpoints/epoch=107-val_f1=0.8772.ckpt"
 
