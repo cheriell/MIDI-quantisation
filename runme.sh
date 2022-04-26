@@ -22,10 +22,10 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="Default"
+experiment_name="data_augmentation_ablation_study"
 
 option="train"
-model_type="baseline"  # "note_sequence" or "baseline"  | default: "note_sequence"
+model_type="note_sequence"  # "note_sequence" or "baseline"  | default: "note_sequence"
 
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
 pitch_encoding="midi"  # "midi" or "chroma" | best: "midi"
@@ -33,13 +33,14 @@ onset_encoding="shift-onehot"  # "shift-onehot", "shift-raw", "absolute-onehot" 
 duration_encoding="raw"  # "raw" or "onehot" | best: "raw"
 
 # run_name=$pitch_encoding"."$onset_encoding"."$duration_encoding  # input_encoding_experiments run_name
-# run_name="no_duration"  # input_ablation_study run_name
-run_name='baseline_model'  # model_type=baseline run_name
+# run_name="no_velocity"  # input_ablation_study run_name
+# run_name='baseline_model'  # model_type=baseline run_name
+run_name="all_dataaug"  # data augmentation ablation run_name
 
-workers="0"  # default: "8", debug: "0"
+workers="8"  # default: "8", debug: "0"
 gpus="4"  # default: "4", debug: "1"
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/2/3b46be0fb292454b9fc8ee649a2cfee5/checkpoints/epoch=107-val_f1=0.8772.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/2/427166dd051d40379613ef5c13036f11/checkpoints/epoch=120-val_f1=0.8734.ckpt"
 
 echo ">>> "$option" the model"
 

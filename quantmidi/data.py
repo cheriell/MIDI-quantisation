@@ -186,8 +186,8 @@ class DataAugmentation():
         tempo_change_range=(0.8, 1.2),
         pitch_shift_prob=1.0,
         pitch_shift_range=(-12, 12),
-        extra_note_prob=0.0,
-        missing_note_prob=1.0):
+        extra_note_prob=0.5,
+        missing_note_prob=0.5):
 
         if extra_note_prob + missing_note_prob > 1.:
             raise ValueError('extra_note_prob + missing_note_prob must be less than 1.')
@@ -229,7 +229,22 @@ class DataAugmentation():
         return note_sequence
 
     def extra_note(self, note_sequence):
-        return note_sequence
+        ratio = random.random() * 0.2  # do not add too many extra notes
+        note_sequence_new = torch.zeros((int(len(note_sequence) * (1. + ratio)), 4)).to(note_sequence.device)
+
+        idxs_new = set(random.sample(range(len(note_sequence_new)), len(note_sequence)))
+        idx = 0
+        for i in range(len(note_sequence_new)):
+            if i in idxs_new:
+                note_sequence_new[i] = note_sequence[idx]
+                if idx < len(note_sequence) - 1:
+                    idx += 1
+            else:
+                note_sequence_new[i] = note_sequence[idx]
+                shift = random.choice([-12, 12])
+                note_sequence_new[i][0] += shift
+
+        return note_sequence_new
 
     def missing_note(self, note_sequence):
         # find successing concurrent notes

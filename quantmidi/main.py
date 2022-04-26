@@ -61,12 +61,27 @@ def main():
     # dataset_folder
     # workspace
     # experiment_name
+    # option
     # model_type
     if args.model_type not in ['note_sequence', 'baseline']:
         raise ValueError('Invalid model type: {}'.format(args.model_type))
+    # features
     if args.model_type == 'baseline':
         assert args.features == ['pitch', 'onset', 'duration', 'velocity'], "Invalid features for baseline model"
     # workers
+    if args.model_type == 'baseline':
+        if args.workers >= 1:
+            args.workers = 0
+            print('INFO: Reset number of workers to 0 for baseline model.')
+    if args.option == 'test' or args.option == 'evaluate':
+        if args.workers >= 1:
+            args.workers = 0
+            print('INFO: Reset number of workers to 0 for testing/evaluation.')
+    # gpus
+    if args.option == 'test' or args.option == 'evaluate':
+        if args.gpus > 1:
+            args.gpus = 1
+            print('INFO: Reset number of GPUs to 1 for testing/evaluation.')
     # verbose
     
     # ========= create workspace =========
