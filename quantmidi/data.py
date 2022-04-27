@@ -17,16 +17,22 @@ tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
 
 
 class QuantMIDIDataModule(LightningDataModule):
-    def __init__(self, feature_folder, model_type, workers):
+    def __init__(self, feature_folder, model_type, data_aug_args, workers):
         super().__init__()
         self.feature_folder = feature_folder
         self.model_type = model_type
+        self.data_aug_args = data_aug_args
 
         self.workers = workers if model_type == 'note_sequence' else 0
         self.bs = batch_size if model_type == 'note_sequence' else 1
 
     def train_dataloader(self):
-        dataset = QuantMIDIDataset(self.feature_folder, 'train', self.model_type)
+        dataset = QuantMIDIDataset(
+            self.feature_folder, 
+            'train', 
+            self.model_type, 
+            data_aug_args=self.data_aug_args
+        )
         sampler = torch.utils.data.sampler.RandomSampler(dataset)
         train_loader = torch.utils.data.dataloader.DataLoader(
             dataset,
@@ -63,7 +69,12 @@ class QuantMIDIDataModule(LightningDataModule):
 
 class QuantMIDIDataset(torch.utils.data.Dataset):
 
-    def __init__(self, feature_folder, split, model_type):
+    def __init__(self, 
+        feature_folder, 
+        split, 
+        model_type,
+        **kwargs
+    ):
         super().__init__()
         self.feature_folder = feature_folder
         self.split = split
@@ -81,7 +92,17 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             self.piece2row[row['piece_id']].append(i)
 
         # initialize data augmentation
-        self.dataaug = DataAugmentation()
+        if split == 'train':
+            data_aug_args = kwargs['data_aug_args']
+
+            self.dataaug = DataAugmentation(
+                tempo_change_prob=data_aug_args['tempo_change_prob'],
+                tempo_change_range=data_aug_args['tempo_change_range'],
+                pitch_shift_prob=data_aug_args['pitch_shift_prob'],
+                pitch_shift_range=data_aug_args['pitch_shift_range'],
+                extra_note_prob=data_aug_args['extra_note_prob'],
+                missing_note_prob=data_aug_args['missing_note_prob'],
+            )
 
     def __len__(self):
         if self.split == 'train':
@@ -190,7 +211,9 @@ class DataAugmentation():
         missing_note_prob=0.5):
 
         if extra_note_prob + missing_note_prob > 1.:
-            raise ValueError('extra_note_prob + missing_note_prob must be less than 1.')
+            extra_note_prob, missing_note_prob = extra_note_prob / (extra_note_prob + missing_note_prob), \
+                                                missing_note_prob / (extra_note_prob + missing_note_prob)
+            print('INFO: Reset extra_note_prob and missing_note_prob to', extra_note_prob, missing_note_prob)
         
         self.tempo_change_prob = tempo_change_prob
         self.tempo_change_range = tempo_change_range

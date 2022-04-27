@@ -47,6 +47,16 @@ def main():
     parser.add_argument('--duration_encoding', type=str, help='Encoding of duration features. Select one \
                         from [raw, onehot].', default='raw')
 
+    # data augmentation parameters
+    parser.add_argument('--tempo_change_prob', type=float, help='Probability of tempo change', default=1.0)
+    parser.add_argument('--tempo_change_range', type=float, nargs='+', help='Range of tempo change', \
+                        default=[0.8, 1.2])
+    parser.add_argument('--pitch_shift_prob', type=float, help='Probability of pitch shift', default=1.0)
+    parser.add_argument('--pitch_shift_range', type=float, nargs='+', help='Range of pitch shift', \
+                        default=[-12, 12])
+    parser.add_argument('--extra_note_prob', type=float, help='Probability of extra note', default=0.5)
+    parser.add_argument('--missing_note_prob', type=float, help='Probability of missing note', default=0.5)
+
     # parallelization
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing', default=8)
     parser.add_argument('--gpus', type=int, help='Number of GPUs to use', default=4)
@@ -89,8 +99,16 @@ def main():
     tracking_uri = str(Path(args.workspace, 'mlruns'))
 
     # ========= create dataset, model, logger =========
+    data_aug_args = {
+        'tempo_change_prob': args.tempo_change_prob,
+        'tempo_change_range': args.tempo_change_range,
+        'pitch_shift_prob': args.pitch_shift_prob,
+        'pitch_shift_range': args.pitch_shift_range,
+        'extra_note_prob': args.extra_note_prob,
+        'missing_note_prob': args.missing_note_prob,
+    }
     datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
-                                    workers=args.workers)
+                                    data_aug_args=data_aug_args, workers=args.workers)
     model = QuantMIDIModel(
         model_type=args.model_type,
         features=args.features,
@@ -109,6 +127,14 @@ def main():
             'pitch_encoding': args.pitch_encoding,
             'onset_encoding': args.onset_encoding,
             'duration_encoding': args.duration_encoding,
+            'tempo_change_prob': args.tempo_change_prob,
+            'tempo_change_range': ','.join(map(str, args.tempo_change_range)),
+            'pitch_shift_prob': args.pitch_shift_prob,
+            'pitch_shift_range': ','.join(map(str, args.pitch_shift_range)),
+            'extra_note_prob': args.extra_note_prob,
+            'missing_note_prob': args.missing_note_prob,
+            'workers': args.workers,
+            'gpus': args.gpus,
         },
     )
 
