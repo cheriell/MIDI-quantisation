@@ -35,6 +35,7 @@ def main():
                         evaluate]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
                         [baseline]', default='note_sequence')
+    parser.add_argument('--beat_only', action='store_true', help='Only train on beats')
 
     # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
@@ -94,7 +95,7 @@ def main():
             print('INFO: Reset number of GPUs to 1 for testing/evaluation.')
     # verbose
     
-    # ========= create workspace =========
+    # ========= get workspace =========
     feature_folder = str(Path(args.workspace, 'features'))
     tracking_uri = str(Path(args.workspace, 'mlruns'))
 
@@ -144,7 +145,7 @@ def main():
         logger=logger,
         log_every_n_steps=50,
         reload_dataloaders_every_n_epochs=True,
-        gpus=args.gpus if args.option == 'train' else 1,
+        gpus=args.gpus,
         # resume_from_checkpoint=args.model_checkpoint,
     )
 

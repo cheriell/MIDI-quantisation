@@ -260,11 +260,11 @@ class FeaturePreparation():
                 # get note sequence
                 note_sequence = DataUtils.get_note_sequence_from_midi(row['midi_perfm'])
                 # get beat sequence
-                beats = DataUtils.get_beats_from_annot_file(row['annot_file'])
+                beats, downbeats = DataUtils.get_beats_from_annot_file(row['annot_file'])
             else:
-                note_sequence, beats = DataUtils.get_note_sequence_and_beats_from_midi(row['midi_perfm'])
+                note_sequence, beats, downbeats = DataUtils.get_note_sequence_and_beats_from_midi(row['midi_perfm'])
 
-            pickle.dump((note_sequence, beats), open(row['feature_file'], 'wb'))
+            pickle.dump((note_sequence, beats, downbeats), open(row['feature_file'], 'wb'))
 
         # prepare features with multiprocessing
         rows = [row for _, row in self.metadata.iterrows()]

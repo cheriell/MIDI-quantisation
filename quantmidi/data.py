@@ -313,11 +313,13 @@ class DataUtils():
         note_sequence = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data.instruments])
         note_sequence = sorted(note_sequence, key=cmp_to_key(DataUtils.compare_note_order))
         beats = midi_data.get_beats()
+        downbeats = midi_data.get_downbeats()
         # conver to Tensor
         note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \
                                         for note in note_sequence])
         beats = torch.Tensor(beats)
-        return note_sequence, beats
+        downbeats = torch.Tensor(downbeats)
+        return note_sequence, beats, downbeats
 
     @staticmethod
     def get_beats_from_annot_file(annot_file):
@@ -326,9 +328,11 @@ class DataUtils():
         """
         annot_data = pd.read_csv(str(Path(annot_file)), header=None, sep='\t')
         beats = annot_data[0].tolist()
+        downbeats = annot_data[annot_data[2] == 'db'][0].tolist()
         # conver to Tensor
         beats = torch.Tensor(beats)
-        return beats
+        downbeats = torch.Tensor(downbeats)
+        return beats, downbeats
 
     @staticmethod
     def compare_note_order(note1, note2):

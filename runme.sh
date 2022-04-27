@@ -40,19 +40,19 @@ duration_encoding="raw"  # "raw" or "onehot" | best: "raw"
 # run_name="no_velocity"  # input_ablation_study run_name
 
 ## data augmentation
-tempo_change_prob=1.0  # 0.0 to 1.0 | default: 1.0
+tempo_change_prob=0.0  # 0.0 to 1.0 | default: 1.0
 tempo_change_range="0.8 1.2"  # default: [0.8, 1.2]
-pitch_shift_prob=0.0  # 0.0 to 1.0 | default: 1.0
+pitch_shift_prob=1.0  # 0.0 to 1.0 | default: 1.0
 pitch_shift_range="-12 12"  # default: [-12, 12]
 extra_note_prob=0.5  # 0.0 to 1.0 | default: 0.5
 missing_note_prob=0.5  # 0.0 to 1.0 | default: 0.5
 
-run_name="no_pitch_shift"  # data augmentation ablation run_name
+run_name="no_tempo_change.cont"  # data augmentation ablation run_name
 
 workers=8  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/2/427166dd051d40379613ef5c13036f11/checkpoints/epoch=120-val_f1=0.8734.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/3/63ce89099e84407684709075af4099ff/checkpoints/last.ckpt"
 
 echo ">>> "$option" the model"
 
@@ -76,5 +76,6 @@ python3 quantmidi/main.py \
     --workers $workers \
     --gpus $gpus \
     --model_checkpoint $model_checkpoint \
-    # --verbose
+    --verbose \
+    # --beat_only
 
