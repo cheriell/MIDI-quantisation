@@ -224,25 +224,29 @@ class DataAugmentation():
         return note_sequence, beats
 
     def pitch_shift(self, note_sequence):
-        shift = random.uniform(*self.pitch_shift_range)
+        shift = round(random.uniform(*self.pitch_shift_range))
         note_sequence[:,0] += shift
         return note_sequence
 
     def extra_note(self, note_sequence):
-        ratio = random.random() * 0.2  # do not add too many extra notes
-        note_sequence_new = torch.zeros((int(len(note_sequence) * (1. + ratio)), 4)).to(note_sequence.device)
+        # duplicate
+        note_sequence_new = torch.zeros(len(note_sequence) * 2, 4)
+        note_sequence_new[::2,:] = note_sequence.clone()
+        note_sequence_new[1::2,:] = note_sequence.clone()
 
-        idxs_new = set(random.sample(range(len(note_sequence_new)), len(note_sequence)))
-        idx = 0
-        for i in range(len(note_sequence_new)):
-            if i in idxs_new:
-                note_sequence_new[i] = note_sequence[idx]
-                if idx < len(note_sequence) - 1:
-                    idx += 1
-            else:
-                note_sequence_new[i] = note_sequence[idx]
-                shift = random.choice([-12, 12])
-                note_sequence_new[i][0] += shift
+        # keep a random ratio of extra notes
+        ratio = random.random() * 0.3
+        probs = torch.rand(len(note_sequence_new))
+        probs[::2] = 0.
+        remaining = probs < ratio
+        note_sequence_new = note_sequence_new[remaining]
+
+        # pitch shift for extra notes (+-12)
+        shift = ((torch.round(torch.rand(len(note_sequence_new))) - 0.5) * 24).int()
+        shift[::2] = 0
+        note_sequence_new[:,0] += shift
+        note_sequence_new[:,0][note_sequence_new[:,0] < 0] += 12
+        note_sequence_new[:,0][note_sequence_new[:,0] > 127] -= 12
 
         return note_sequence_new
 
