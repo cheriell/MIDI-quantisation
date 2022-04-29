@@ -22,7 +22,8 @@ def main():
     parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders in the order \
                         of ASAP, A_MAPS, CPM, ACPAS')
     parser.add_argument('--feature_folder', type=str, help='Path to the feature folder')
-    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing')
+    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing, 0 for not using \
+                        multiprocessing')
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
     args = parser.parse_args()
 
@@ -32,11 +33,12 @@ def main():
     # workers
     # verbose
 
+    # ========= feature preparation =========
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
     # featprep.prepare_metadata()
+    # featprep.print_statistics()
     featprep.load_metadata()
     featprep.prepare_features()
-    featprep.print_statistics()
 
 
 class FeaturePreparation():
@@ -259,17 +261,24 @@ class FeaturePreparation():
             if row['source'] == 'ASAP':
                 # get note sequence
                 note_sequence = DataUtils.get_note_sequence_from_midi(row['midi_perfm'])
-                # get beat sequence
-                beats, downbeats = DataUtils.get_beats_from_annot_file(row['annot_file'])
+                # get annotations dict (beats, downbeats, key signatures, time signatures)
+                annotations = DataUtils.get_annotations_from_annot_file(row['annot_file'])
             else:
-                note_sequence, beats, downbeats = DataUtils.get_note_sequence_and_beats_from_midi(row['midi_perfm'])
+                # get note sequence and annotations dict
+                # (beats, downbeats, key signatures, time signatures, musical onset times, note value in beats, hand parts)
+                note_sequence, annotations = DataUtils.get_note_sequence_and_annotations_from_midi(row['midi_perfm'])
 
-            pickle.dump((note_sequence, beats, downbeats), open(row['feature_file'], 'wb'))
+            pickle.dump((note_sequence, annotations), open(row['feature_file'], 'wb'))
 
-        # prepare features with multiprocessing
-        rows = [row for _, row in self.metadata.iterrows()]
-        pool = Pool(self.workers)
-        pool.map(prepare_one_feature, rows)
+        if self.workers > 0:
+            # prepare features with multiprocessing
+            rows = [row for _, row in self.metadata.iterrows()]
+            pool = Pool(self.workers)
+            pool.map(prepare_one_feature, rows)
+        else:
+            # prepare features without multiprocessing
+            for _, row in self.metadata.iterrows():
+                prepare_one_feature(row)
 
         self.verboseprint('INFO: Features prepared')
         

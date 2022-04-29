@@ -33,9 +33,8 @@ def main():
     
     parser.add_argument('--option', type=str, help='Options for the experiment, select from [train, test, \
                         evaluate]', default='train')
-    parser.add_argument('--model_type', type=str, help='Type of the model, select from [note_sequence], \
-                        [baseline]', default='note_sequence')
-    parser.add_argument('--beat_only', action='store_true', help='Only train on beats')
+    parser.add_argument('--model_type', type=str, help='Type of the model, select one from [note_sequence, \
+                        baseline, proposed]', default='proposed')
 
     # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
@@ -74,25 +73,27 @@ def main():
     # experiment_name
     # option
     # model_type
-    if args.model_type not in ['note_sequence', 'baseline']:
+    if args.model_type not in ['note_sequence', 'baseline', 'proposed']:
         raise ValueError('Invalid model type: {}'.format(args.model_type))
     # features
-    if args.model_type == 'baseline':
-        assert args.features == ['pitch', 'onset', 'duration', 'velocity'], "Invalid features for baseline model"
+    if args.model_type in ['baseline', 'proposed']:
+        if args.features != ['pitch', 'onset', 'duration', 'velocity']:
+            print("INFO: Invalid features for {} model. Using default features instead.".format(args.model_type))
+            args.features = ['pitch', 'onset', 'duration', 'velocity']
     # workers
     if args.model_type == 'baseline':
         if args.workers >= 1:
-            args.workers = 0
             print('INFO: Reset number of workers to 0 for baseline model.')
+            args.workers = 0
     if args.option == 'test' or args.option == 'evaluate':
         if args.workers >= 1:
-            args.workers = 0
             print('INFO: Reset number of workers to 0 for testing/evaluation.')
+            args.workers = 0
     # gpus
     if args.option == 'test' or args.option == 'evaluate':
         if args.gpus > 1:
-            args.gpus = 1
             print('INFO: Reset number of GPUs to 1 for testing/evaluation.')
+            args.gpus = 1
     # verbose
     
     # ========= get workspace =========

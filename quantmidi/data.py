@@ -15,6 +15,20 @@ max_length = 500  # maximum note sequence length during training
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
 
+# key in sharps in mido
+keySharps2Name = [
+    'C', 'G', 'D', 'A', 'E', 'B', 'F#', 
+    'C#m', 'G#m', 'D#m', 'Bbm', 'Fm',
+    'Gm', 'Dm', 'Am', 'Em', 'Bm', 'F#m', 
+    'Db', 'Ab', 'Eb', 'Bb', 'F',
+]
+keyName2Sharps = dict([(name, sharp if sharp <= 11 else sharp - 23) for sharp, name in enumerate(keySharps2Name)])
+# key in numbers in pretty_midi
+keyNumber2Name = [
+    'C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
+    'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm',
+]
+keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
 
 class QuantMIDIDataModule(LightningDataModule):
     def __init__(self, feature_folder, model_type, data_aug_args, workers):
@@ -136,7 +150,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         row = self.metadata.iloc[row_id]
 
         # get feature
-        note_sequence, beats = pickle.load(open(str(Path(self.feature_folder, row['feature_file'])), 'rb'))
+        note_sequence, annotations = pickle.load(open(str(Path(self.feature_folder, row['feature_file'])), 'rb'))
+        beats = annotations['beats']
 
         # data augmentation
         if self.split == 'train':
@@ -293,46 +308,102 @@ class DataUtils():
     def get_note_sequence_from_midi(midi_file):
         """
         Get note sequence from midi file.
-        Note sequence is a list of (pitch, onset, duration, velocity) tuples.
+        Note sequence is in a list of (pitch, onset, duration, velocity) tuples, in torch.Tensor.
         """
         midi_data = pm.PrettyMIDI(str(Path(midi_file)))
         note_sequence = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data.instruments])
         note_sequence = sorted(note_sequence, key=cmp_to_key(DataUtils.compare_note_order))
         # conver to Tensor
-        note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \
+        note_sequence = torch.Tensor([(note.pitch, note.start, note.end-note.start, note.velocity) \
                                         for note in note_sequence])
         return note_sequence
 
     @staticmethod
-    def get_note_sequence_and_beats_from_midi(midi_file):
+    def get_annotations_from_annot_file(annot_file):
         """
-        Get beat sequence from midi file.
-        Note sequence is a list of (pitch, onset, duration, velocity) tuples.
+        Get annotations from annotation file in ASAP dataset.
+        annotatioins in a dict of {
+            beats: list of beat times,
+            downbeats: list of downbeat times,
+            time_signatures: list of (time, numerator, denominator) tuples,
+            key_signatures: list of (time, sharps) tuples
+        }, all in torch.Tensor.
+        """
+        annot_data = pd.read_csv(str(Path(annot_file)), header=None, sep='\t')
+
+        beats, downbeats, key_signatures, time_signatures = [], [], [], []
+        for i, row in annot_data.iterrows():
+            a = row[2].split(',')
+            # beats
+            beats.append(row[0])
+            # downbeats
+            if a[0] == 'db':
+                downbeats.append(row[0])
+            # time_signatures
+            if len(a) >= 2 and a[1] != '':
+                numerator, denominator = a[1].split('/')
+                time_signatures.append((row[0], int(numerator), int(denominator)))
+            # key_signatures
+            if len(a) == 3 and a[2] != '':
+                key_signatures.append((row[0], int(a[2])))
+
+        # save as annotation dict
+        annotations = {
+            'beats': torch.Tensor(beats),
+            'downbeats': torch.Tensor(downbeats),
+            'time_signatures': torch.Tensor(time_signatures),
+            'key_signatures': torch.Tensor(key_signatures),
+        }
+        return annotations
+
+    @staticmethod
+    def get_note_sequence_and_annotations_from_midi(midi_file):
+        """
+        Get beat sequence and annotations from midi file.
+        Note sequence is in a list of (pitch, onset, duration, velocity) tuples, in torch.Tensor.
+        annotations in a dict of {
+            beats: list of beat times,
+            downbeats: list of downbeat times,
+            time_signatures: list of (time, numerator, denominator) tuples,
+            key_signatures: list of (time, sharps) tuples,
+            onsets_musical: list of onsets in musical time (within a beat),
+            note_value: list of note values (in beats),
+            hand: list of hand (0: left, 1: right)
         """
         midi_data = pm.PrettyMIDI(str(Path(midi_file)))
+
+        # note sequence
         note_sequence = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data.instruments])
         note_sequence = sorted(note_sequence, key=cmp_to_key(DataUtils.compare_note_order))
-        beats = midi_data.get_beats()
-        downbeats = midi_data.get_downbeats()
         # conver to Tensor
         note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \
                                         for note in note_sequence])
-        beats = torch.Tensor(beats)
-        downbeats = torch.Tensor(downbeats)
-        return note_sequence, beats, downbeats
 
-    @staticmethod
-    def get_beats_from_annot_file(annot_file):
-        """
-        Get beat sequence from annotation file.
-        """
-        annot_data = pd.read_csv(str(Path(annot_file)), header=None, sep='\t')
-        beats = annot_data[0].tolist()
-        downbeats = annot_data[annot_data[2] == 'db'][0].tolist()
-        # conver to Tensor
-        beats = torch.Tensor(beats)
-        downbeats = torch.Tensor(downbeats)
-        return beats, downbeats
+        # beats
+        beats = midi_data.get_beats()
+        # downbeats
+        downbeats = midi_data.get_downbeats()
+        # time_signatures
+        time_signatures = [(t.time, t.numerator, t.denominator) for t in midi_data.time_signature_changes]
+        # key_signatures
+        key_signatures = [(k.time, keyName2Sharps[keyNumber2Name[k.key_number]]) for k in \
+                            midi_data.key_signature_changes]
+        # onsets_musical
+        # note_value
+        
+        # hand
+
+        # save as annotation dict
+        annotations = {
+            'beats': torch.Tensor(beats),
+            'downbeats': torch.Tensor(downbeats),
+            'time_signatures': torch.Tensor(time_signatures),
+            'key_signatures': torch.Tensor(key_signatures),
+            'onsets_musical': None,
+            'note_value': None,
+            'hand': None,
+        }
+        return note_sequence, annotations
 
     @staticmethod
     def compare_note_order(note1, note2):
