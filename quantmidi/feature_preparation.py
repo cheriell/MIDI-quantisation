@@ -23,7 +23,7 @@ def main():
                         of ASAP, A_MAPS, CPM, ACPAS')
     parser.add_argument('--feature_folder', type=str, help='Path to the feature folder')
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing, 0 for not using \
-                        multiprocessing')
+                        multiprocessing, minus for using default number of workers', default=mp.cpu_count())
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
     args = parser.parse_args()
 
@@ -31,6 +31,12 @@ def main():
     # dataset_folder
     # feature_folder
     # workers
+    if args.workers < 0:
+        args.workers = mp.cpu_count()
+        print('INFO: Using default number of workers: {}'.format(args.workers))
+    if args.workers > mp.cpu_count():
+        args.workers = mp.cpu_count()
+        print('INFO: Number of workers is greater than the number of CPU cores, setting to {}'.format(args.workers))
     # verbose
 
     # ========= feature preparation =========
@@ -62,7 +68,7 @@ class FeaturePreparation():
         if self.verbose:
             def verboseprint(*args):
                 for arg in args:
-                    print(arg, end=' ')
+                    print(arg, end='  ')
                 print()
         else:
             verboseprint = lambda *a: None      # do-nothing function
@@ -259,6 +265,7 @@ class FeaturePreparation():
             self.verboseprint('INFO: Preparing feature {}'.format(row['performance_id']))
 
             if row['source'] == 'ASAP':
+                return
                 # get note sequence
                 note_sequence = DataUtils.get_note_sequence_from_midi(row['midi_perfm'])
                 # get annotations dict (beats, downbeats, key signatures, time signatures)

@@ -10,19 +10,22 @@ import pickle
 import numpy as np
 
 
+# ============= Constants =============
+## model training related data
 batch_size = 32
 max_length = 500  # maximum note sequence length during training
+
+## quantisation resolution
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
 
+## key signature definitions
 # key in sharps in mido
-keySharps2Name = [
-    'C', 'G', 'D', 'A', 'E', 'B', 'F#', 
-    'C#m', 'G#m', 'D#m', 'Bbm', 'Fm',
-    'Gm', 'Dm', 'Am', 'Em', 'Bm', 'F#m', 
-    'Db', 'Ab', 'Eb', 'Bb', 'F',
-]
-keyName2Sharps = dict([(name, sharp if sharp <= 11 else sharp - 23) for sharp, name in enumerate(keySharps2Name)])
+keySharps2Name = {0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F#',
+                  7: 'C#m', 8: 'G#m', 9: 'D#m', 10: 'Bbm', 11: 'Fm', 12: 'Cm',
+                  -11: 'Gm', -10: 'Dm', -9: 'Am', -8: 'Em', -7: 'Bm', -6: 'F#m',
+                  -5: 'Db', -4: 'Ab', -3: 'Eb', -2: 'Bb', -1: 'F'}
+keyName2Sharps = dict([(name, sharp) for sharp, name in keySharps2Name.items()])
 # key in numbers in pretty_midi
 keyNumber2Name = [
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
@@ -30,6 +33,7 @@ keyNumber2Name = [
 ]
 keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
 
+# ============== Classes & Functions ==============
 class QuantMIDIDataModule(LightningDataModule):
     def __init__(self, feature_folder, model_type, data_aug_args, workers):
         super().__init__()
@@ -353,6 +357,9 @@ class DataUtils():
             'downbeats': torch.Tensor(downbeats),
             'time_signatures': torch.Tensor(time_signatures),
             'key_signatures': torch.Tensor(key_signatures),
+            'onsets_musical': None,
+            'note_value': None,
+            'hands': None,
         }
         return annotations
 
@@ -368,16 +375,31 @@ class DataUtils():
             key_signatures: list of (time, sharps) tuples,
             onsets_musical: list of onsets in musical time (within a beat),
             note_value: list of note values (in beats),
-            hand: list of hand (0: left, 1: right)
+            hands: list of hand (0: left, 1: right)
         """
         midi_data = pm.PrettyMIDI(str(Path(midi_file)))
 
-        # note sequence
-        note_sequence = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data.instruments])
-        note_sequence = sorted(note_sequence, key=cmp_to_key(DataUtils.compare_note_order))
-        # conver to Tensor
-        note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \
-                                        for note in note_sequence])
+        # note sequence and hands
+        if len(midi_data.instruments) == 2:
+            # two hand parts
+            note_sequence_with_hand = []
+            for hand, inst in enumerate(midi_data.instruments):
+                for note in inst.notes:
+                    note_sequence_with_hand.append((note, hand))
+
+            def compare_note_with_hand(x, y):
+                return DataUtils.compare_note_order(x[0], y[0])
+            note_sequence_with_hand = sorted(note_sequence_with_hand, key=cmp_to_key(compare_note_with_hand))
+
+            note_sequence, hands = [], []
+            for note, hand in note_sequence_with_hand:
+                note_sequence.append(note)
+                hands.append(hand)
+        else:
+            # ignore data with other numbers of hand parts
+            note_sequence = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data.instruments])
+            note_sequence = sorted(note_sequence, key=cmp_to_key(DataUtils.compare_note_order))
+            hands = None
 
         # beats
         beats = midi_data.get_beats()
@@ -388,20 +410,32 @@ class DataUtils():
         # key_signatures
         key_signatures = [(k.time, keyName2Sharps[keyNumber2Name[k.key_number]]) for k in \
                             midi_data.key_signature_changes]
-        # onsets_musical
-        # note_value
-        
-        # hand
+        # onsets_musical and note_values
+        def time2pos(time):
+            # convert time to position in musical time within a beat (unit: beat, range: 0-1)
+            # after checking, we confirmed that beats[0] is always 0
+            idx = np.where(beats - time <= tolerance)[0][-1]
+            if idx+1 < len(beats):
+                base = midi_data.time_to_tick(beats[idx+1]) - midi_data.time_to_tick(beats[idx])
+            else:
+                base = midi_data.time_to_tick(beats[-1]) - midi_data.time_to_tick(beats[-2])
+            return (midi_data.time_to_tick(time) - midi_data.time_to_tick(beats[idx])) / base
 
+        onsets_musical = [time2pos(note.start) for note in note_sequence]
+        note_values = [time2pos(note.end) - time2pos(note.start) for note in note_sequence]
+
+        # conver to Tensor
+        note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \
+                                        for note in note_sequence])
         # save as annotation dict
         annotations = {
             'beats': torch.Tensor(beats),
             'downbeats': torch.Tensor(downbeats),
             'time_signatures': torch.Tensor(time_signatures),
             'key_signatures': torch.Tensor(key_signatures),
-            'onsets_musical': None,
-            'note_value': None,
-            'hand': None,
+            'onsets_musical': torch.Tensor(onsets_musical),
+            'note_value': torch.Tensor(note_values),
+            'hands': torch.Tensor(hands) if hands is not None else None,
         }
         return note_sequence, annotations
 
