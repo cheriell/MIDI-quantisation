@@ -78,11 +78,11 @@ class BaselineModel(pl.LightningModule):
             nn.Sigmoid()
         )
 
-    def forward(self, x):
+    def forward(self, x, length):
         # x.shape = (batch_size, note_sequence_length, len(features)), batch_size = 1
 
         # ======== get piano roll ==========
-        x = ModelUtils.get_pianoroll_from_batch_data(x)  # (1, 128, pr_length)
+        x = ModelUtils.get_pianoroll_from_batch_data(x, length)  # (1, 128, pr_length)
         x = x.unsqueeze(1)  # (1, 1, 128, pr_length)
 
         # ======== ConvBlock frontend ==========
@@ -138,8 +138,7 @@ class BaselineModel(pl.LightningModule):
         y = y.float()
 
         # predict
-        x = ModelUtils.input_feature_ablation(x, self.features)
-        y_hat = self(x)
+        y_hat = self(x, length)
 
         # mask out the padded part (avoid inplace operation)
         mask = torch.ones(y_hat.shape).float().to(y_hat.device)
@@ -161,8 +160,7 @@ class BaselineModel(pl.LightningModule):
         y = y.float()
 
         # predict
-        x = ModelUtils.input_feature_ablation(x, self.features)
-        y_hat = self.forward(x)
+        y_hat = self.forward(x, length)
 
         # mask out the padded part
         for i in range(y_hat.shape[0]):

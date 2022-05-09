@@ -26,7 +26,7 @@ experiment_name="Default"
 run_name='testing'
 
 option="train"  # "train", "test" or "evaluate"
-model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="baseline"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 
 ## input features
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"

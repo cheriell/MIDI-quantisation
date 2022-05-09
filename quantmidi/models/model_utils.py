@@ -168,17 +168,18 @@ class ModelUtils():
         return in_features
 
     @staticmethod
-    def get_pianoroll_from_batch_data(x):
+    def get_pianoroll_from_batch_data(x, length):
         # x.shape = (batch_size, length, len(features)), batch_size = 1
         assert x.shape[0] == 1, 'Batch size must be 1.'
         assert x.shape[2] == 4, 'Number of features must be 4.'
 
-        pr_length = (torch.max(x[:,:,1] + x[:,:,2]) * (1 / resolution) + 1).long()
+        pr_length = torch.max(length).long()
         pr = torch.zeros(1, 128, pr_length).float().to(x.device)
 
         for i in range(x.shape[1]):
             start = torch.round(x[0,i,1] * (1 / resolution)).long()
-            end = torch.round((x[0,i,1] + x[0,i,2]) * (1 / resolution)).long()
-            pr[0,x[0,i,0].long(),start:end] = x[0,i,3] / 127.0
+            if start < pr_length:
+                end = torch.round((x[0,i,1] + x[0,i,2]) * (1 / resolution)).long()
+                pr[0,x[0,i,0].long(),start:min(end, pr_length)] = x[0,i,3] / 127.0
 
         return pr

@@ -5,7 +5,7 @@ import numpy as np
 from functools import reduce, cmp_to_key
 from pathlib import Path
 
-from quantmidi.data.constants import resolution, tolerance, keyName2Sharps, keyNumber2Name
+from quantmidi.data.constants import resolution, tolerance, keyName2Sharps, keyNumber2Name, max_pr_length
 
 class DataUtils():
     
@@ -163,6 +163,7 @@ class DataUtils():
         Get beat activation from beat sequence.
         """
         beat_activation_length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
+        beat_activation_length = torch.min(beat_activation_length, torch.tensor(max_pr_length)).long()
         beat_activation = torch.zeros(beat_activation_length).float()
         for beat in beats:
             left = int(max(0, torch.round(beat - tolerance)))

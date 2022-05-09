@@ -9,6 +9,7 @@ from pathlib import Path
 
 from quantmidi.data.data_module import QuantMIDIDataModule
 from quantmidi.models.note_sequence import NoteSequenceModel
+from quantmidi.models.baseline import BaselineModel
 
 ## -------------------------
 ## DEBUGGING BLOCK
@@ -123,6 +124,8 @@ def main():
             onset_encoding=args.onset_encoding,
             duration_encoding=args.duration_encoding,
         )
+    elif args.model_type == 'baseline':
+        model = BaselineModel()
 
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,

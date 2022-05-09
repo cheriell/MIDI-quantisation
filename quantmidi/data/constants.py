@@ -16,3 +16,6 @@ keyNumber2Name = [
     'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm',
 ]
 keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
+
+# ========= model training related constants =========
+max_pr_length = 10 * 60 / resolution
