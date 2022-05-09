@@ -7,7 +7,7 @@ import pytorch_lightning as pl
 pl.seed_everything(42)
 from pathlib import Path
 
-from quantmidi.data import QuantMIDIDataModule
+from quantmidi.data.data_module import QuantMIDIDataModule
 from quantmidi.models.note_sequence import NoteSequenceModel
 
 ## -------------------------
@@ -115,6 +115,7 @@ def main():
     }
     datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
                                     data_aug_args=data_aug_args, workers=args.workers)
+
     if args.model_type == 'note_sequence':
         model = NoteSequenceModel(
             features=args.features,
@@ -122,6 +123,7 @@ def main():
             onset_encoding=args.onset_encoding,
             duration_encoding=args.duration_encoding,
         )
+
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,
         tracking_uri=tracking_uri,

@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from quantmidi.data import resolution
+from quantmidi.data.constants import resolution
 
 class ModelUtils():
 
