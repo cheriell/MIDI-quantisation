@@ -265,7 +265,6 @@ class FeaturePreparation():
             self.verboseprint('INFO: Preparing feature {}'.format(row['performance_id']))
 
             if row['source'] == 'ASAP':
-                return
                 # get note sequence
                 note_sequence = DataUtils.get_note_sequence_from_midi(row['midi_perfm'])
                 # get annotations dict (beats, downbeats, key signatures, time signatures)

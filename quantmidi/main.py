@@ -8,7 +8,7 @@ pl.seed_everything(42)
 from pathlib import Path
 
 from quantmidi.data import QuantMIDIDataModule
-from quantmidi.model import QuantMIDIModel
+from quantmidi.models.note_sequence import NoteSequenceModel
 
 ## -------------------------
 ## DEBUGGING BLOCK
@@ -56,6 +56,10 @@ def main():
                         default=[-12, 12])
     parser.add_argument('--extra_note_prob', type=float, help='Probability of extra note', default=0.5)
     parser.add_argument('--missing_note_prob', type=float, help='Probability of missing note', default=0.5)
+
+    # output data comparison
+    parser.add_argument('--output_type', type=str, help='Type of output for musical onsets and note values, \
+                        select from [regression, classification]', default='regression')
 
     # parallelization
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing', default=8)
@@ -111,13 +115,13 @@ def main():
     }
     datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
                                     data_aug_args=data_aug_args, workers=args.workers)
-    model = QuantMIDIModel(
-        model_type=args.model_type,
-        features=args.features,
-        pitch_encoding=args.pitch_encoding,
-        onset_encoding=args.onset_encoding,
-        duration_encoding=args.duration_encoding,
-    )
+    if args.model_type == 'note_sequence':
+        model = NoteSequenceModel(
+            features=args.features,
+            pitch_encoding=args.pitch_encoding,
+            onset_encoding=args.onset_encoding,
+            duration_encoding=args.duration_encoding,
+        )
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,
         tracking_uri=tracking_uri,
@@ -135,6 +139,7 @@ def main():
             'pitch_shift_range': ','.join(map(str, args.pitch_shift_range)),
             'extra_note_prob': args.extra_note_prob,
             'missing_note_prob': args.missing_note_prob,
+            'output_type': args.output_type,
             'workers': args.workers,
             'gpus': args.gpus,
         },
