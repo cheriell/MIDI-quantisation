@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+from sklearn.metrics import classification_report
 
 from quantmidi.data.constants import resolution, max_length_pr
 
@@ -200,3 +201,16 @@ class ModelUtils():
         r = TP / (TP + FN + np.finfo(float).eps)
         f = 2 * p * r / (p + r + np.finfo(float).eps)
         return acc, p, r, f
+
+    @staticmethod
+    def classification_report_framewise(y, y_hat):
+        report = classification_report(y.tolist(), y_hat.tolist(), output_dict=True)
+
+        prec_macro = report['macro avg']['precision']
+        rec_macro = report['macro avg']['recall']
+        f1_macro = report['macro avg']['f1-score']
+        prec_weighted = report['weighted avg']['precision']
+        rec_weighted = report['weighted avg']['recall']
+        f1_weighted = report['weighted avg']['f1-score']
+        
+        return prec_macro, rec_macro, f1_macro, prec_weighted, rec_weighted, f1_weighted

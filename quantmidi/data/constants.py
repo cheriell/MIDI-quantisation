@@ -5,7 +5,13 @@
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
 
-## key signature definitions
+# =========== time signature definitions ===========
+tsDenominators = [2, 4, 8, 16, 32]
+tsDeno2Index = {2: 0, 4: 1, 8: 2, 16: 3, 32: 4}
+tsIndex2Deno = {0: 2, 1: 4, 2: 8, 3: 16, 4: 32}
+tsVocabSize = len(tsDenominators)
+
+# =========== key signature definitions ==========
 # key in sharps in mido
 keySharps2Name = {0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F#',
                   7: 'C#m', 8: 'G#m', 9: 'D#m', 10: 'Bbm', 11: 'Fm', 12: 'Cm',
@@ -18,6 +24,9 @@ keyNumber2Name = [
     'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm',
 ]
 keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
+keySharps2Number = dict([(sharp, keyName2Number[keySharps2Name[sharp]]) for sharp in keySharps2Name.keys()])
+keyNumber2Sharps = dict([(number, keyName2Sharps[keyNumber2Name[number]]) for number in range(len(keyNumber2Name))])
+keyVocabSize = len(keySharps2Name)
 
 # ========= model training related constants =========
 batch_size_note_sequence = 32  # batch size for training on note sequence model

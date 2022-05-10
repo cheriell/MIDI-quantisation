@@ -6,7 +6,13 @@ import numpy as np
 from functools import reduce, cmp_to_key
 from pathlib import Path
 
-from quantmidi.data.constants import resolution, tolerance, keyName2Sharps, keyNumber2Name, max_length_pr
+from quantmidi.data.constants import (
+    resolution, 
+    tolerance, 
+    keySharps2Number, 
+    tsDeno2Index, 
+    max_length_pr
+)
 
 class DataUtils():
     
@@ -32,7 +38,7 @@ class DataUtils():
             beats: list of beat times,
             downbeats: list of downbeat times,
             time_signatures: list of (time, numerator, denominator) tuples,
-            key_signatures: list of (time, sharps) tuples
+            key_signatures: list of (time, key_number) tuples
         }, all in torch.Tensor.
         """
         annot_data = pd.read_csv(str(Path(annot_file)), header=None, sep='\t')
@@ -51,7 +57,7 @@ class DataUtils():
                 time_signatures.append((row[0], int(numerator), int(denominator)))
             # key_signatures
             if len(a) == 3 and a[2] != '':
-                key_signatures.append((row[0], int(a[2])))
+                key_signatures.append((row[0], keySharps2Number[int(a[2])]))
 
         # save as annotation dict
         annotations = {
@@ -74,7 +80,7 @@ class DataUtils():
             beats: list of beat times,
             downbeats: list of downbeat times,
             time_signatures: list of (time, numerator, denominator) tuples,
-            key_signatures: list of (time, sharps) tuples,
+            key_signatures: list of (time, key_number) tuples,
             onsets_musical: list of onsets in musical time (within a beat),
             note_value: list of note values (in beats),
             hands: list of hand (0: left, 1: right)
@@ -110,7 +116,7 @@ class DataUtils():
         # time_signatures
         time_signatures = [(t.time, t.numerator, t.denominator) for t in midi_data.time_signature_changes]
         # key_signatures
-        key_signatures = [(k.time, keyName2Sharps[keyNumber2Name[k.key_number]]) for k in \
+        key_signatures = [(k.time, k.key_number) for k in \
                             midi_data.key_signature_changes]
         # onsets_musical and note_values
         def time2pos(time):
@@ -159,20 +165,21 @@ class DataUtils():
             return 1
 
     @staticmethod
-    def get_beat_downbeat_activation(note_sequence, annotations, sample_segment=True):
+    def get_baseline_model_output_data(note_sequence, annotations, sample_segment=True):
         """
         Get beat and downbeat activation from beat and downbeat sequence.
         """
 
-        # get valid length for the activation function (also used for piano roll)
+        # get valid length for the pianorolls
         length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
         length = torch.min(length, torch.tensor(max_length_pr)).long()
 
-        # get the activation functions
-        beats = annotations['beats']
-        downbeats = annotations['downbeats']
+        # start time of the segment
         t0 = note_sequence[0, 1]
 
+        # get beat and downbeat activation functions
+        beats = annotations['beats']
+        downbeats = annotations['downbeats']
         beat_act = torch.zeros(max_length_pr).float()
         downbeat_act = torch.zeros(max_length_pr).float()
 
@@ -185,4 +192,30 @@ class DataUtils():
             right = int(min(length, max(0, torch.round((downbeat - t0 + tolerance) / resolution))))
             downbeat_act[left:right] = 1.0
 
-        return beat_act, downbeat_act, length
+        # get time signature denominators
+        time_signatures = annotations['time_signatures']
+        ts_denos = torch.zeros(max_length_pr).long()
+
+        for i in range(len(time_signatures)):
+            left = int(min(length, max(0, torch.round((time_signatures[i,0] - t0) / resolution))))
+            if i+1 < len(time_signatures):
+                right = int(min(length, max(0, torch.round((time_signatures[i+1,0] - t0) / resolution))))
+            else:
+                right = length
+
+            ts_denos[left:right] = tsDeno2Index[int(time_signatures[i,2])]
+
+        # get key signature outputs
+        key_signatures = annotations['key_signatures']
+        key_numbers = torch.zeros(max_length_pr).long()
+
+        for i in range(len(key_signatures)):
+            left = int(min(length, max(0, torch.round((key_signatures[i,0] - t0) / resolution))))
+            if i+1 < len(key_signatures):
+                right = int(min(length, max(0, torch.round((key_signatures[i+1,0] - t0) / resolution))))
+            else:
+                right = length
+                
+            key_numbers[left:right] = key_signatures[i,1]
+
+        return beat_act, downbeat_act, ts_denos, key_numbers, length

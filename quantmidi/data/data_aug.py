@@ -1,7 +1,7 @@
 import torch
 import random
 
-from quantmidi.data.constants import tolerance
+from quantmidi.data.constants import tolerance, keySharps2Number, keyNumber2Sharps
 
 class DataAugmentation():
     def __init__(self, 
@@ -31,7 +31,7 @@ class DataAugmentation():
 
         # pitch shift
         if random.random() < self.pitch_shift_prob:
-            note_sequence = self.pitch_shift(note_sequence)
+            note_sequence, annotations = self.pitch_shift(note_sequence, annotations)
 
         # extra note or missing note
         extra_or_missing = random.random()
@@ -47,12 +47,19 @@ class DataAugmentation():
         note_sequence[:,1:3] *= 1 / tempo_change_ratio
         annotations['beats'] *= 1 / tempo_change_ratio
         annotations['downbeats'] *= 1 / tempo_change_ratio
+        annotations['time_signatures'][:,0] *= 1 / tempo_change_ratio
+        annotations['key_signatures'][:,0] *= 1 / tempo_change_ratio
         return note_sequence, annotations
 
-    def pitch_shift(self, note_sequence):
+    def pitch_shift(self, note_sequence, annotations):
         shift = round(random.uniform(*self.pitch_shift_range))
         note_sequence[:,0] += shift
-        return note_sequence
+
+        for i in range(len(annotations['key_signatures'])):
+            annotations['key_signatures'][i,1] += shift
+            annotations['key_signatures'][i,1] %= 24
+            
+        return note_sequence, annotations
 
     def extra_note(self, note_sequence):
         # duplicate

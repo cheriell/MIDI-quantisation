@@ -13,7 +13,7 @@ import pickle
 import numpy as np
 import shutil
 
-from quantmidi.data import DataUtils
+from quantmidi.data.data_utils import DataUtils
 
 
 def main():
@@ -273,7 +273,7 @@ class FeaturePreparation():
                 # get note sequence and annotations dict
                 # (beats, downbeats, key signatures, time signatures, musical onset times, note value in beats, hand parts)
                 note_sequence, annotations = DataUtils.get_note_sequence_and_annotations_from_midi(row['midi_perfm'])
-
+            
             pickle.dump((note_sequence, annotations), open(row['feature_file'], 'wb'))
 
         if self.workers > 0:
