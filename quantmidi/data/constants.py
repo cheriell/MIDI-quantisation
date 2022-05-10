@@ -26,7 +26,7 @@ keyNumber2Name = [
 keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
 keySharps2Number = dict([(sharp, keyName2Number[keySharps2Name[sharp]]) for sharp in keySharps2Name.keys()])
 keyNumber2Sharps = dict([(number, keyName2Sharps[keyNumber2Name[number]]) for number in range(len(keyNumber2Name))])
-keyVocabSize = len(keySharps2Name)
+keyVocabSize = len(keySharps2Name) // 2  # ignore minor keys in key signature prediction!
 
 # ========= model training related constants =========
 batch_size_note_sequence = 32  # batch size for training on note sequence model

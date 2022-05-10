@@ -10,6 +10,7 @@ from quantmidi.data.constants import (
     resolution, 
     tolerance, 
     keySharps2Number, 
+    keyVocabSize,
     tsDeno2Index, 
     max_length_pr
 )
@@ -216,6 +217,6 @@ class DataUtils():
             else:
                 right = length
                 
-            key_numbers[left:right] = key_signatures[i,1]
+            key_numbers[left:right] = key_signatures[i,1] % keyVocabSize
 
         return beat_act, downbeat_act, ts_denos, key_numbers, length
