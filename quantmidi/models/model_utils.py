@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-from quantmidi.data.constants import resolution
+from quantmidi.data.constants import resolution, max_length_pr
 
 class ModelUtils():
 
@@ -170,18 +170,22 @@ class ModelUtils():
 
     @staticmethod
     def get_pianoroll_from_batch_data(x, length):
-        # x.shape = (batch_size, length, len(features)), batch_size = 1
-        assert x.shape[0] == 1, 'Batch size must be 1.'
+        # x.shape = (batch_size, length, len(features))
         assert x.shape[2] == 4, 'Number of features must be 4.'
 
-        pr_length = torch.max(length).long()
-        pr = torch.zeros(1, 128, pr_length).float().to(x.device)
+        pr = torch.zeros(x.shape[0], 128, max_length_pr).float().to(x.device)
 
-        for i in range(x.shape[1]):
-            start = torch.round(x[0,i,1] * (1 / resolution)).long()
-            if start < pr_length:
-                end = torch.round((x[0,i,1] + x[0,i,2]) * (1 / resolution)).long()
-                pr[0,x[0,i,0].long(),start:min(end, pr_length)] = x[0,i,3] / 127.0
+        for bi in range(x.shape[0]):
+            t0 = x[bi, 0, 1]
+            for ni in range(x.shape[1]):
+                pitch = x[bi, ni, 0]
+                onset = x[bi, ni, 1] - t0
+                offset = x[bi, ni, 1] + x[bi, ni, 2] - t0
+                velocity = x[bi, ni, 3] / 127.0
+
+                start = min(max_length_pr, max(0, int(torch.round(onset / resolution))))
+                end = min(max_length_pr, max(0, int(torch.round(offset / resolution))))
+                pr[bi, pitch.long(), start:end] = velocity
 
         return pr
 

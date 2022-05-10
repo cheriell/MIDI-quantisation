@@ -82,23 +82,23 @@ class BaselineModel(pl.LightningModule):
         # x.shape = (batch_size, note_sequence_length, len(features)), batch_size = 1
 
         # ======== get piano roll ==========
-        x = ModelUtils.get_pianoroll_from_batch_data(x, length)  # (1, 128, pr_length)
-        x = x.unsqueeze(1)  # (1, 1, 128, pr_length)
-
+        x = ModelUtils.get_pianoroll_from_batch_data(x, length)  # (batch_size, 128, pr_length)
+        x = x.unsqueeze(1)  # (batch_size, 1, 128, pr_length)
+        
         # ======== ConvBlock frontend ==========
-        x = self.convs(x)  # (1, 20, 1, pr_length)
-        x = x.squeeze(2)  # (1, 20, pr_length)
+        x = self.convs(x)  # (batch_size, 20, 1, pr_length)
+        x = x.squeeze(2)  # (batch_size, 20, pr_length)
         
         # ======== TCN block 11 alyers, 1*2 dilation, 20 channels ==========
         for i in range(self.tcn_layers):
-            x, x_skip = self.tcns[i](x)  # (1, 20, pr_length)
-        x = self.relu(x)  # (1, 20, pr_length)
-        x = x.transpose(1, 2)  # (1, pr_length, 20)
+            x, x_skip = self.tcns[i](x)  # (batch_size, 20, pr_length)
+        x = self.relu(x)  # (batch_size, 20, pr_length)
+        x = x.transpose(1, 2)  # (batch_size, pr_length, 20)
 
         # ======== Linear output layer and sigmoid activation ==========
-        x = self.out_layer(x)  # (1, pr_length, 2)
-        y_b = x[:,:,0]  # (1, pr_length)
-        y_db = x[:,:,1]  # (1, pr_length)
+        x = self.out_layer(x)  # (batch_size, pr_length, 2)
+        y_b = x[:,:,0]  # (batch_size, pr_length)
+        y_db = x[:,:,1]  # (batch_size, pr_length)
 
         return y_b, y_db
 
@@ -122,7 +122,7 @@ class BaselineModel(pl.LightningModule):
             monitor='val_f_beat',
             mode='max',
             save_top_k=3,
-            filename='{epoch}-{val_f1:.4f}',
+            filename='{epoch}-{val_f_beat:.4f}',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(

@@ -1,4 +1,6 @@
 
+
+# ========== data representation related constants ==========
 ## quantisation resolution
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
@@ -18,4 +20,8 @@ keyNumber2Name = [
 keyName2Number = dict([(name, number) for number, name in enumerate(keyNumber2Name)])
 
 # ========= model training related constants =========
-max_pr_length = 10 * 60 / resolution
+batch_size_note_sequence = 32  # batch size for training on note sequence model
+batch_size_baseline = 8  # batch size for training on baseline model
+
+max_length_note_sequence = 500  # maximum note sequence length for training note sequence model
+max_length_pr = int(30 / resolution)  # maximum pianoroll length for training baseline model

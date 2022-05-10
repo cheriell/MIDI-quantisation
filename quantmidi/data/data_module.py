@@ -1,7 +1,11 @@
 import torch
 import pytorch_lightning as pl
 
-from quantmidi.data.dataset import batch_size, QuantMIDIDataset
+from quantmidi.data.dataset import QuantMIDIDataset
+from quantmidi.data.constants import (
+    batch_size_note_sequence,
+    batch_size_baseline,
+)
 
 class QuantMIDIDataModule(pl.LightningDataModule):
     def __init__(self, feature_folder, model_type, data_aug_args, workers):
@@ -10,8 +14,12 @@ class QuantMIDIDataModule(pl.LightningDataModule):
         self.model_type = model_type
         self.data_aug_args = data_aug_args
 
-        self.workers = workers if model_type == 'note_sequence' else 0
-        self.bs = batch_size if model_type == 'note_sequence' else 1
+        self.workers = workers
+
+        if self.model_type == 'note_sequence':
+            self.bs = batch_size_note_sequence
+        elif self.model_type == 'baseline':
+            self.bs = batch_size_baseline
 
     def train_dataloader(self):
         dataset = QuantMIDIDataset(

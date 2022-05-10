@@ -1,11 +1,12 @@
 import torch
+import random
 import pretty_midi as pm
 import pandas as pd
 import numpy as np
 from functools import reduce, cmp_to_key
 from pathlib import Path
 
-from quantmidi.data.constants import resolution, tolerance, keyName2Sharps, keyNumber2Name, max_pr_length
+from quantmidi.data.constants import resolution, tolerance, keyName2Sharps, keyNumber2Name, max_length_pr
 
 class DataUtils():
     
@@ -158,26 +159,30 @@ class DataUtils():
             return 1
 
     @staticmethod
-    def get_beat_downbeat_activation(note_sequence, annotations):
+    def get_beat_downbeat_activation(note_sequence, annotations, sample_segment=True):
         """
         Get beat and downbeat activation from beat and downbeat sequence.
         """
+
+        # get valid length for the activation function (also used for piano roll)
+        length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
+        length = torch.min(length, torch.tensor(max_length_pr)).long()
+
+        # get the activation functions
         beats = annotations['beats']
         downbeats = annotations['downbeats']
+        t0 = note_sequence[0, 1]
 
-        length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
-        length = torch.min(length, torch.tensor(max_pr_length)).long()
-
-        beat_act = torch.zeros(length).float()
-        downbeat_act = torch.zeros(length).float()
+        beat_act = torch.zeros(max_length_pr).float()
+        downbeat_act = torch.zeros(max_length_pr).float()
 
         for beat in beats:
-            left = int(max(0, torch.round((beat - tolerance) / resolution)))
-            right = int(min(length, torch.round((beat + tolerance) / resolution)))
+            left = int(min(length, max(0, torch.round((beat - t0 - tolerance) / resolution))))
+            right = int(min(length, max(0, torch.round((beat - t0 + tolerance) / resolution))))
             beat_act[left:right] = 1.0
         for downbeat in downbeats:
-            left = int(max(0, torch.round((downbeat - tolerance) / resolution)))
-            right = int(min(length, torch.round((downbeat + tolerance) / resolution)))
+            left = int(min(length, max(0, torch.round((downbeat - t0 - tolerance) / resolution))))
+            right = int(min(length, max(0, torch.round((downbeat - t0 + tolerance) / resolution))))
             downbeat_act[left:right] = 1.0
 
         return beat_act, downbeat_act, length

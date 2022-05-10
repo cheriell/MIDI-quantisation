@@ -8,11 +8,14 @@ from collections import defaultdict
 
 from quantmidi.data.data_aug import DataAugmentation
 from quantmidi.data.data_utils import DataUtils
-from quantmidi.data.constants import tolerance, resolution
+from quantmidi.data.constants import (
+    tolerance, 
+    resolution, 
+    max_length_note_sequence, 
+    batch_size_note_sequence, 
+    batch_size_baseline
+)
 
-## model training related data
-batch_size = 32
-max_length = 500  # maximum note sequence length during training
 
 class QuantMIDIDataset(torch.utils.data.Dataset):
 
@@ -26,6 +29,10 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         self.feature_folder = feature_folder
         self.split = split
         self.model_type = model_type
+        if self.model_type == 'note_sequence':
+            self.batch_size = batch_size_note_sequence
+        elif self.model_type == 'baseline':
+            self.batch_size = batch_size_baseline
 
         # get metadata
         self.metadata = pd.read_csv(str(Path(self.feature_folder, 'metadata.csv')))
@@ -54,18 +61,12 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
     def __len__(self):
         if self.split == 'train':
             # constantly update 200 steps per epoch, not related to training dataset size
-            if self.model_type == 'note_sequence':
-                return batch_size * 4 * 200
-            elif self.model_type == 'baseline':
-                return 4 * 200
+            return self.batch_size * 4 * 200
 
         elif self.split == 'valid':
             # by istinct pieces in validation set
             self.pieces = list(self.piece2row.keys())
-            if self.model_type == 'note_sequence':
-                return batch_size * len(self.piece2row)  # valid dataset size
-            elif self.model_type == 'baseline':
-                return 4 * len(self.piece2row)
+            return self.batch_size * len(self.piece2row)  # valid dataset size
 
         elif self.split == 'test':
             return len(self.metadata)
@@ -76,8 +77,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             piece_id = random.choice(list(self.piece2row.keys()))   # random sampling by piece
             row_id = random.choice(self.piece2row[piece_id])
         elif self.split == 'valid':
-            piece_id = self.pieces[idx // batch_size]    # by istinct pieces in validation set
-            row_id = self.piece2row[piece_id][idx % batch_size % len(self.piece2row[piece_id])]
+            piece_id = self.pieces[idx // self.batch_size]    # by istinct pieces in validation set
+            row_id = self.piece2row[piece_id][idx % self.batch_size % len(self.piece2row[piece_id])]
         elif self.split == 'test':
             row_id = idx
         row = self.metadata.iloc[row_id]
@@ -96,13 +97,13 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             # ========== get model input ==========
             # list of tuples (pitch, onset, duration, velocity) in torch tensor
-            # randomly select a segment by max_length
-            if len(note_sequence) > max_length:
+            # randomly select a segment by max_length_note_sequence
+            if len(note_sequence) > max_length_note_sequence:
                 if self.split == 'train':
-                    start_idx = random.randint(0, len(note_sequence) - max_length)
-                    end_idx = start_idx + max_length
+                    start_idx = random.randint(0, len(note_sequence) - max_length_note_sequence)
+                    end_idx = start_idx + max_length_note_sequence
                 elif self.split == 'valid':
-                    start_idx, end_idx = 0, max_length  # validate on the segment starting with the first note
+                    start_idx, end_idx = 0, max_length_note_sequence  # validate on the segment starting with the first note
                 elif self.split == 'test':
                     start_idx, end_idx = 0, len(note_sequence)  # test on the whole note sequence
             else:
@@ -127,21 +128,47 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             # ============ pad if length is shorter than max_length ============
             length = len(note_sequence)
-            if len(note_sequence) < max_length:
-                note_sequence = torch.cat([note_sequence, torch.zeros((max_length - len(note_sequence), 4))])
-                beat_probs = torch.cat([beat_probs, torch.zeros(max_length - len(beat_probs))])
+            if len(note_sequence) < max_length_note_sequence:
+                note_sequence = torch.cat([note_sequence, torch.zeros((max_length_note_sequence - len(note_sequence), 4))])
+                beat_probs = torch.cat([beat_probs, torch.zeros(max_length_note_sequence - len(beat_probs))])
 
             return note_sequence, beat_probs, length
 
         def get_data_baseline(note_sequence, annotations):
             # ========== get model input ==========
-            # still note sequence, but do not segment by max_length this time.
-            # convert to pianoroll in model forward - it's faster to use the GPU.
+            # Convert to pianoroll in model forward - it's faster to use the GPU.
             # forward note_sequence directly to model input.
+            # List of tuples (pitch, onset, duration, velocity) in torch tensor
+            # randomly select a segment by max_length_note_sequence
+            if len(note_sequence) > max_length_note_sequence:
+                if self.split == 'train':
+                    start_idx = random.randint(0, len(note_sequence) - max_length_note_sequence)
+                    end_idx = start_idx + max_length_note_sequence
+                elif self.split == 'valid':
+                    start_idx, end_idx = 0, max_length_note_sequence  # validate on the segment starting with the first note
+                elif self.split == 'test':
+                    start_idx, end_idx = 0, len(note_sequence)  # test on the whole note sequence
+            else:
+                start_idx, end_idx = 0, len(note_sequence)
+            note_sequence = note_sequence[start_idx:end_idx]
+            # pad if length is shorter than max_length_note_sequence
+            if len(note_sequence) < max_length_note_sequence:
+                note_sequence = torch.cat([note_sequence, torch.zeros((max_length_note_sequence - len(note_sequence), 4))])
 
             # =========== get model output ===========
             # list of beat probs in torch tensor.
-            beat_act, downbeat_act, length = DataUtils.get_beat_downbeat_activation(note_sequence, annotations)
+            if self.split == 'train':
+                beat_act, downbeat_act, length = DataUtils.get_beat_downbeat_activation(
+                    note_sequence, 
+                    annotations,
+                    sample_segment=True,
+                )
+            elif self.split == 'valid':
+                beat_act, downbeat_act, length = DataUtils.get_beat_downbeat_activation(
+                    note_sequence,
+                    annotations,
+                    sample_segment=True,
+                )
 
             return note_sequence, beat_act, downbeat_act, length
 
