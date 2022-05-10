@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 from quantmidi.data.constants import resolution
 
@@ -183,3 +184,15 @@ class ModelUtils():
                 pr[0,x[0,i,0].long(),start:min(end, pr_length)] = x[0,i,3] / 127.0
 
         return pr
+
+    @staticmethod
+    def f_measure_framewise(y, y_hat):
+        acc = (y_hat == y).float().mean()
+        TP = torch.logical_and(y_hat==1, y==1).float().sum()
+        FP = torch.logical_and(y_hat==1, y==0).float().sum()
+        FN = torch.logical_and(y_hat==0, y==1).float().sum()
+
+        p = TP / (TP + FP + np.finfo(float).eps)
+        r = TP / (TP + FN + np.finfo(float).eps)
+        f = 2 * p * r / (p + r + np.finfo(float).eps)
+        return acc, p, r, f

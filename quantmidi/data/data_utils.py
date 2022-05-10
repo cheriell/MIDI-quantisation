@@ -158,15 +158,26 @@ class DataUtils():
             return 1
 
     @staticmethod
-    def get_beat_activation(note_sequence, beats):
+    def get_beat_downbeat_activation(note_sequence, annotations):
         """
-        Get beat activation from beat sequence.
+        Get beat and downbeat activation from beat and downbeat sequence.
         """
-        beat_activation_length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
-        beat_activation_length = torch.min(beat_activation_length, torch.tensor(max_pr_length)).long()
-        beat_activation = torch.zeros(beat_activation_length).float()
+        beats = annotations['beats']
+        downbeats = annotations['downbeats']
+
+        length = (torch.max(note_sequence[:,1] + note_sequence[:,2]) * (1 / resolution) + 1).long()
+        length = torch.min(length, torch.tensor(max_pr_length)).long()
+
+        beat_act = torch.zeros(length).float()
+        downbeat_act = torch.zeros(length).float()
+
         for beat in beats:
-            left = int(max(0, torch.round(beat - tolerance)))
-            right = int(min(beat_activation_length, torch.round(beat + tolerance)))
-            beat_activation[left:right] = 1.0
-        return beat_activation, beat_activation_length
+            left = int(max(0, torch.round((beat - tolerance) / resolution)))
+            right = int(min(length, torch.round((beat + tolerance) / resolution)))
+            beat_act[left:right] = 1.0
+        for downbeat in downbeats:
+            left = int(max(0, torch.round((downbeat - tolerance) / resolution)))
+            right = int(min(length, torch.round((downbeat + tolerance) / resolution)))
+            downbeat_act[left:right] = 1.0
+
+        return beat_act, downbeat_act, length

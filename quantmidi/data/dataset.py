@@ -53,9 +53,9 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         if self.split == 'train':
+            # constantly update 200 steps per epoch, not related to training dataset size
             if self.model_type == 'note_sequence':
-                return batch_size * 4 * 200     # constantly update 200 steps per epoch
-                                                # not related to training dataset size
+                return batch_size * 4 * 200
             elif self.model_type == 'baseline':
                 return 4 * 200
 
@@ -84,15 +84,16 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
         # get feature
         note_sequence, annotations = pickle.load(open(str(Path(self.feature_folder, row['feature_file'])), 'rb'))
-        beats = annotations['beats']
 
         # data augmentation
         if self.split == 'train':
-            note_sequence, beats = self.dataaug(note_sequence, beats)
+            note_sequence, annotations = self.dataaug(note_sequence, annotations)
 
         # sample segment and get model input & output
 
-        def sample_segment_note_sequence(note_sequence, beats):
+        def get_data_note_sequence(note_sequence, annotations):
+            beats = annotations['beats']
+
             # ========== get model input ==========
             # list of tuples (pitch, onset, duration, velocity) in torch tensor
             # randomly select a segment by max_length
@@ -132,7 +133,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             return note_sequence, beat_probs, length
 
-        def sample_segment_baseline(note_sequence, beats):
+        def get_data_baseline(note_sequence, annotations):
             # ========== get model input ==========
             # still note sequence, but do not segment by max_length this time.
             # convert to pianoroll in model forward - it's faster to use the GPU.
@@ -140,11 +141,11 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             # =========== get model output ===========
             # list of beat probs in torch tensor.
-            beat_probs, length = DataUtils.get_beat_activation(note_sequence, beats)
+            beat_act, downbeat_act, length = DataUtils.get_beat_downbeat_activation(note_sequence, annotations)
 
-            return note_sequence, beat_probs, length
+            return note_sequence, beat_act, downbeat_act, length
 
         if self.model_type == 'note_sequence':
-            return sample_segment_note_sequence(note_sequence, beats)
+            return get_data_note_sequence(note_sequence, annotations)
         elif self.model_type == 'baseline':
-            return sample_segment_baseline(note_sequence, beats)
+            return get_data_baseline(note_sequence, annotations)

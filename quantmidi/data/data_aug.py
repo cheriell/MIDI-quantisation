@@ -24,10 +24,10 @@ class DataAugmentation():
         self.extra_note_prob = extra_note_prob
         self.missing_note_prob = missing_note_prob
 
-    def __call__(self, note_sequence, beats):
+    def __call__(self, note_sequence, annotations):
         # tempo change
         if random.random() < self.tempo_change_prob:
-            note_sequence, beats = self.tempo_change(note_sequence, beats)
+            note_sequence, annotations = self.tempo_change(note_sequence, annotations)
 
         # pitch shift
         if random.random() < self.pitch_shift_prob:
@@ -40,13 +40,14 @@ class DataAugmentation():
         elif extra_or_missing > 1. - self.missing_note_prob:
             note_sequence = self.missing_note(note_sequence)
 
-        return note_sequence, beats
+        return note_sequence, annotations
 
-    def tempo_change(self, note_sequence, beats):
+    def tempo_change(self, note_sequence, annotations):
         tempo_change_ratio = random.uniform(*self.tempo_change_range)
         note_sequence[:,1:3] *= 1 / tempo_change_ratio
-        beats *= 1 / tempo_change_ratio
-        return note_sequence, beats
+        annotations['beats'] *= 1 / tempo_change_ratio
+        annotations['downbeats'] *= 1 / tempo_change_ratio
+        return note_sequence, annotations
 
     def pitch_shift(self, note_sequence):
         shift = round(random.uniform(*self.pitch_shift_range))

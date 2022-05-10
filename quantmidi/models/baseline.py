@@ -97,9 +97,10 @@ class BaselineModel(pl.LightningModule):
 
         # ======== Linear output layer and sigmoid activation ==========
         x = self.out_layer(x)  # (1, pr_length, 2)
-        x = x[:,:,0]  # (1, pr_length)
+        y_b = x[:,:,0]  # (1, pr_length)
+        y_db = x[:,:,1]  # (1, pr_length)
 
-        return x
+        return y_b, y_db
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -118,14 +119,14 @@ class BaselineModel(pl.LightningModule):
 
     def configure_callbacks(self):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor='val_f1',
+            monitor='val_f_beat',
             mode='max',
             save_top_k=3,
             filename='{epoch}-{val_f1:.4f}',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(
-            monitor='val_f1',
+            monitor='val_f_beat',
             patience=200,
             mode='max',
         )
@@ -133,21 +134,23 @@ class BaselineModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # data
-        x, y, length = batch
+        x, y_b, y_db, length = batch
         x = x.float()
-        y = y.float()
+        y_b = y_b.float()
+        y_db = y_db.float()
 
         # predict
-        y_hat = self(x, length)
+        y_b_hat, y_db_hat = self(x, length)
 
         # mask out the padded part (avoid inplace operation)
-        mask = torch.ones(y_hat.shape).float().to(y_hat.device)
-        for i in range(y_hat.shape[0]):
+        mask = torch.ones(y_b_hat.shape).float().to(y_b_hat.device)
+        for i in range(y_b_hat.shape[0]):
             mask[i, length[i]:] = 0
-        y_hat = y_hat * mask
+        y_b_hat = y_b_hat * mask
+        y_db_hat = y_db_hat * mask
 
         # compute loss
-        loss = F.binary_cross_entropy(y_hat, y)
+        loss = F.binary_cross_entropy(y_b_hat, y_b) + F.binary_cross_entropy(y_db_hat, y_db)
         self.log('train_loss', loss, prog_bar=True)
 
         return {'loss': loss, 'logs': {'train_loss': loss}}
@@ -155,45 +158,55 @@ class BaselineModel(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         # data
-        x, y, length = batch
+        x, y_b, y_db, length = batch
         x = x.float()
-        y = y.float()
+        y_b = y_b.float()
+        y_db = y_db.float()
 
         # predict
-        y_hat = self.forward(x, length)
+        y_b_hat, y_db_hat = self.forward(x, length)
 
         # mask out the padded part
-        for i in range(y_hat.shape[0]):
-            y_hat[i, length[i]:] = 0
+        for i in range(y_b_hat.shape[0]):
+            y_b_hat[i, length[i]:] = 0
+            y_db_hat[i, length[i]:] = 0
 
         # compute loss
-        loss = F.binary_cross_entropy(y_hat, y)
+        loss = F.binary_cross_entropy(y_b_hat, y_b) + F.binary_cross_entropy(y_db_hat, y_db)
 
         # metrics
-        accs, precs, recs, f1s = 0, 0, 0, 0
+        accs_b, precs_b, recs_b, fs_b = 0, 0, 0, 0
+        accs_db, precs_db, recs_db, fs_db = 0, 0, 0, 0
+
         for i in range(x.shape[0]):
-            y_hat_i = torch.round(y_hat[i, :length[i]])
-            y_i = y[i, :length[i]]
+            y_b_hat_i = torch.round(y_b_hat[i, :length[i]])
+            y_db_hat_i = torch.round(y_db_hat[i, :length[i]])
+            y_b_i = y_b[i, :length[i]]
+            y_db_i = y_db[i, :length[i]]
 
-            accs += (y_hat_i == y_i).float().mean()
-            TP = torch.logical_and(y_hat_i==1, y_i==1).float().sum()
-            FP = torch.logical_and(y_hat_i==1, y_i==0).float().sum()
-            FN = torch.logical_and(y_hat_i==0, y_i==1).float().sum()
-
-            p = TP / (TP + FP + np.finfo(float).eps)
-            r = TP / (TP + FN + np.finfo(float).eps)
-            f1 = 2 * p * r / (p + r + np.finfo(float).eps)
-            precs += p
-            recs += r
-            f1s += f1
+            acc_b, prec_b, rec_b, f_b = ModelUtils.f_measure_framewise(y_b_i, y_b_hat_i)
+            acc_db, prec_db, rec_db, f_db = ModelUtils.f_measure_framewise(y_db_i, y_db_hat_i)
+            
+            accs_b += acc_b
+            precs_b += prec_b
+            recs_b += rec_b
+            fs_b += f_b
+            accs_db += acc_db
+            precs_db += prec_db
+            recs_db += rec_db
+            fs_db += f_db
 
         # log
         logs = {
             'val_loss': loss,
-            'val_acc': accs / x.shape[0],
-            'val_p': precs / x.shape[0],
-            'val_r': recs / x.shape[0],
-            'val_f1': f1s / x.shape[0],
+            'val_acc_beat': accs_b / x.shape[0],
+            'val_p_beat': precs_b / x.shape[0],
+            'val_r_beat': recs_b / x.shape[0],
+            'val_f_beat': fs_b / x.shape[0],
+            'val_acc_db': accs_db / x.shape[0],
+            'val_p_db': precs_db / x.shape[0],
+            'val_r_db': recs_db / x.shape[0],
+            'val_f_db': fs_db / x.shape[0],
         }
         self.log_dict(logs, prog_bar=True)
 
