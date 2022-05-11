@@ -22,11 +22,11 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="baseline"
+experiment_name="Default"
 run_name='run_1'
 
 option="train"  # "train", "test" or "evaluate"
-model_type="baseline"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 
 ## input features
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
@@ -41,6 +41,9 @@ pitch_shift_prob=1.0  # 0.0 to 1.0 | default: 1.0
 pitch_shift_range="-12 12"  # default: [-12, 12]
 extra_note_prob=0.5  # 0.0 to 1.0 | default: 0.5 (extra note and missing note not added at the same time for a single piece)
 missing_note_prob=0.5  # 0.0 to 1.0 | default: 0.5
+
+# downbeats or not in note sequence model
+downbeats="True"  # "True" or "False" | default: "False"
 
 ## output data
 output_type="regression"  # "regression" or "classification" | default: "regression"
@@ -70,6 +73,7 @@ python3 quantmidi/main.py \
     --pitch_shift_range $pitch_shift_range \
     --extra_note_prob $extra_note_prob \
     --missing_note_prob $missing_note_prob \
+    --downbeats $downbeats \
     --output_type $output_type \
     --workers $workers \
     --gpus $gpus \

@@ -59,6 +59,9 @@ def main():
     parser.add_argument('--extra_note_prob', type=float, help='Probability of extra note', default=0.5)
     parser.add_argument('--missing_note_prob', type=float, help='Probability of missing note', default=0.5)
 
+    # downbeats or not in note sequence model
+    parser.add_argument('--downbeats', type=bool, help='Whether to output downbeats or not', default=False)
+
     # output data comparison
     parser.add_argument('--output_type', type=str, help='Type of output for musical onsets and note values, \
                         select from [regression, classification]', default='regression')
@@ -120,6 +123,7 @@ def main():
             pitch_encoding=args.pitch_encoding,
             onset_encoding=args.onset_encoding,
             duration_encoding=args.duration_encoding,
+            downbeats=args.downbeats,
         )
     elif args.model_type == 'baseline':
         model = BaselineModel()
