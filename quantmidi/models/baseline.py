@@ -14,47 +14,8 @@ class BaselineModel(pl.LightningModule):
     def __init__(self):
         super().__init__()
         
-        # ========== ConvBlock frontend ==========
-        self.convs = nn.Sequential(
-            nn.Conv2d(
-                in_channels=1,
-                out_channels=20,
-                kernel_size=(3, 3),
-                stride=(1, 1),
-                padding=(0, 1),
-                bias=False,
-            ),
-            nn.BatchNorm2d(20),
-            nn.MaxPool2d((3, 1)),
-            nn.ELU(),
-            nn.Dropout(p=dropout),
-
-            nn.Conv2d(
-                in_channels=20,
-                out_channels=20,
-                kernel_size=(20, 1),
-                stride=(1, 1),
-                padding=(0, 0),
-                bias=False,
-            ),
-            nn.BatchNorm2d(20),
-            nn.MaxPool2d((3, 1)),
-            nn.ELU(),
-            nn.Dropout(p=dropout),
-
-            nn.Conv2d(
-                in_channels=20,
-                out_channels=20,
-                kernel_size=(3, 3),
-                stride=(1, 1),
-                padding=(0, 1),
-                bias=False,
-            ),
-            nn.BatchNorm2d(20),
-            nn.MaxPool2d((3, 1)),
-            nn.ELU(),
-            nn.Dropout(p=dropout),
-        )
+        # ======== ConvBlock frontend ==========
+        self.conv_frontend = ConvFrontEnd()
 
         # ========== TCN block 11 alyers, 1*2 dilation, 20 channels ==========
         self.tcn_layers = 11
@@ -85,7 +46,26 @@ class BaselineModel(pl.LightningModule):
             nn.Linear(20, tsVocabSize),
             nn.LogSoftmax(dim=2)
         )
-        # key signature classification
+
+        # =========== Key signature classification ==========
+
+        self.conv_frontend_key = ConvFrontEnd(out_features=18)
+
+        self.tcn_layers_key = 5
+        self.tcns_key = nn.ModuleList()
+
+        for i in range(self.tcn_layers_key):
+            tcn = TCNLayer(
+                in_channels=20,
+                out_channels=20,
+                kernel_size=5,
+                dilation=2 ** i,
+                p_dropout=dropout
+            )
+            self.tcns_key.append(tcn)
+
+        self.relu_key = nn.ELU()
+
         self.out_key = nn.Sequential(
             nn.Dropout(p=dropout),
             nn.Linear(20, keyVocabSize),
@@ -96,20 +76,21 @@ class BaselineModel(pl.LightningModule):
         # x.shape = (batch_size, note_sequence_length, len(features)), batch_size = 1
 
         # ======== get piano roll ==========
-        x = ModelUtils.get_pianoroll_from_batch_data(x, length)  # (batch_size, 128, pr_length)
-        x = x.unsqueeze(1)  # (batch_size, 1, 128, pr_length)
+        pr = ModelUtils.get_pianoroll_from_batch_data(x, length)  # (batch_size, 128, pr_length)
+        pr = pr.unsqueeze(1)  # (batch_size, 1, 128, pr_length)
         
-        # ======== ConvBlock frontend ==========
-        x = self.convs(x)  # (batch_size, 20, 1, pr_length)
+        # ======== Beats, downbeats ==========
+        ## ConvBlock frontend
+        x = self.conv_frontend(pr)  # (batch_size, 20, 1, pr_length)
         x = x.squeeze(2)  # (batch_size, 20, pr_length)
         
-        # ======== TCN block 11 alyers, 1*2 dilation, 20 channels ==========
+        ## TCN block 11 alyers, 1*2 dilation, 20 channels
         for i in range(self.tcn_layers):
             x, x_skip = self.tcns[i](x)  # (batch_size, 20, pr_length)
         x = self.relu(x)  # (batch_size, 20, pr_length)
         x = x.transpose(1, 2)  # (batch_size, pr_length, 20)
 
-        # ======== Linear output layers ==========
+        ## Linear output layers
         # beats and downbeats activation functions
         y_act = self.out_act(x)  # (batch_size, pr_length, 2)
         y_b = y_act[:,:,0]  # (batch_size, pr_length)
@@ -117,6 +98,19 @@ class BaselineModel(pl.LightningModule):
         # time signature denominator classification
         y_ts = self.out_ts(x)  # (batch_size, pr_length, tsVocabSize)
         y_ts = y_ts.transpose(1, 2)  # (batch_size, tsVocabSize, pr_length)
+
+        # ======== Key signature classification ==========
+        x = self.conv_frontend_key(pr)  # (batch_size, 18, 1, pr_length)
+        x = x.squeeze(2)  # (batch_size, 18, pr_length)
+
+        # concatenate beats and downbeat output
+        x = torch.cat((x, y_act.transpose(1, 2)), dim=1)  # (batch_size, 20, pr_length)
+
+        for i in range(self.tcn_layers_key):
+            x, x_skip = self.tcns_key[i](x)  # (batch_size, 20, pr_length)
+        x = self.relu_key(x)  # (batch_size, 20, pr_length)
+        x = x.transpose(1, 2)  # (batch_size, pr_length, 20)
+
         # key signature classification
         y_key = self.out_key(x)  # (batch_size, pr_length, keyVocabSize)
         y_key = y_key.transpose(1, 2)  # (batch_size, keyVocabSize, pr_length)
@@ -314,6 +308,53 @@ class BaselineModel(pl.LightningModule):
 
         return {'val_loss': loss, 'logs': logs}
 
+class ConvFrontEnd(nn.Module):
+    def __init__(self, out_features=20):
+        super(ConvFrontEnd, self).__init__()
+
+        self.convs = nn.Sequential(
+            nn.Conv2d(
+                in_channels=1,
+                out_channels=20,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(0, 1),
+                bias=False,
+            ),
+            nn.BatchNorm2d(20),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+
+            nn.Conv2d(
+                in_channels=20,
+                out_channels=20,
+                kernel_size=(20, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+                bias=False,
+            ),
+            nn.BatchNorm2d(20),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+
+            nn.Conv2d(
+                in_channels=20,
+                out_channels=out_features,
+                kernel_size=(3, 3),
+                stride=(1, 1),
+                padding=(0, 1),
+                bias=False,
+            ),
+            nn.BatchNorm2d(out_features),
+            nn.MaxPool2d((3, 1)),
+            nn.ELU(),
+            nn.Dropout(p=dropout),
+        )
+
+    def forward(self, x):
+        return self.convs(x)
 
 class TCNLayer(nn.Module):
     def __init__(

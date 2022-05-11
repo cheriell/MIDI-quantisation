@@ -23,7 +23,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training/Testing ===============
 
 experiment_name="baseline_model"
-run_name='run_1'
+run_name='separate_key'
 
 option="train"  # "train", "test" or "evaluate"
 model_type="baseline"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
