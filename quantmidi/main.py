@@ -86,10 +86,6 @@ def main():
             print("INFO: Invalid features for {} model. Using default features instead.".format(args.model_type))
             args.features = ['pitch', 'onset', 'duration', 'velocity']
     # workers
-    if args.model_type == 'baseline':
-        if args.workers >= 1:
-            print('INFO: Reset number of workers to 0 for baseline model.')
-            args.workers = 0
     if args.option == 'test' or args.option == 'evaluate':
         if args.workers >= 1:
             print('INFO: Reset number of workers to 0 for testing/evaluation.')
