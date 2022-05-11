@@ -82,9 +82,9 @@ class DataUtils():
             downbeats: list of downbeat times,
             time_signatures: list of (time, numerator, denominator) tuples,
             key_signatures: list of (time, key_number) tuples,
-            onsets_musical: list of onsets in musical time (within a beat),
+            onsets_musical: list of onsets in musical time for each note (within a beat),
             note_value: list of note values (in beats),
-            hands: list of hand (0: left, 1: right)
+            hands: list of hand part for each note (0: left, 1: right)
         """
         midi_data = pm.PrettyMIDI(str(Path(midi_file)))
 

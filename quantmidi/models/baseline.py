@@ -175,7 +175,7 @@ class BaselineModel(pl.LightningModule):
         loss_key = nn.NLLLoss()(y_key_hat, y_key)
         loss = loss_b + loss_db + loss_ts + loss_key
 
-        # log
+        # logs
         logs = {
             'train_loss': loss,
             'train_loss_b': loss_b,

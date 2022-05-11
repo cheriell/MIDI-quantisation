@@ -19,11 +19,6 @@ class NoteSequenceModel(pl.LightningModule):
         onset_encoding='shift-onehot',
         duration_encoding='raw',
     ):
-        super().__init__()
-
-        self.features = features
-
-
         """
         Model for quantization of MIDI note sequences.
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from quantmidi.data.data_module import QuantMIDIDataModule
 from quantmidi.models.note_sequence import NoteSequenceModel
 from quantmidi.models.baseline import BaselineModel
+from quantmidi.models.proposed import ProposedModel
 
 ## -------------------------
 ## DEBUGGING BLOCK
@@ -122,6 +123,8 @@ def main():
         )
     elif args.model_type == 'baseline':
         model = BaselineModel()
+    elif args.model_type == 'proposed':
+        model = ProposedModel()
 
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,

@@ -5,6 +5,7 @@ from quantmidi.data.dataset import QuantMIDIDataset
 from quantmidi.data.constants import (
     batch_size_note_sequence,
     batch_size_baseline,
+    batch_size_proposed,
 )
 
 class QuantMIDIDataModule(pl.LightningDataModule):
@@ -20,6 +21,8 @@ class QuantMIDIDataModule(pl.LightningDataModule):
             self.bs = batch_size_note_sequence
         elif self.model_type == 'baseline':
             self.bs = batch_size_baseline
+        elif self.model_type == 'proposed':
+            self.bs = batch_size_proposed
 
     def train_dataloader(self):
         dataset = QuantMIDIDataset(
