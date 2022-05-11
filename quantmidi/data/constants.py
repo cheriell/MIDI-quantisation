@@ -31,7 +31,7 @@ keyVocabSize = len(keySharps2Name) // 2  # ignore minor keys in key signature pr
 # ========= model training related constants =========
 batch_size_note_sequence = 32  # batch size for training on note sequence model
 batch_size_baseline = 8  # batch size for training on baseline model
-batch_size_proposed = 32  # batch size for training on proposed model
+batch_size_proposed = 16  # batch size for training on proposed model
 
 max_length_note_sequence = 500  # maximum note sequence length for training note sequence model
 max_length_pr = int(30 / resolution)  # maximum pianoroll length for training baseline model

@@ -22,11 +22,11 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="Default"
+experiment_name="baseline"
 run_name='run_1'
 
 option="train"  # "train", "test" or "evaluate"
-model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="baseline"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 
 ## input features
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
@@ -47,9 +47,9 @@ output_type="regression"  # "regression" or "classification" | default: "regress
 
 ## multiprocessing and data-parallel
 workers=0  # default: 8, debug: 0
-gpus=1  # default: 4, debug: 1
+gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/5/17d9bdc803c3436da89408b7151431c5/checkpoints/last.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/5/5f8d12f3b0224f4c846f7b78be05fb49/checkpoints/last.ckpt"
 
 echo ">>> "$option" the model"
 
