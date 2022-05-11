@@ -348,14 +348,14 @@ class NoteSequenceModel(pl.LightningModule):
     
     def configure_callbacks(self):
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor='val_f1',
+            monitor='val_f_beat',
             mode='max',
             save_top_k=3,
-            filename='{epoch}-{val_f1:.4f}',
+            filename='{epoch}-{val_f_beat:.4f}',
             save_last=True,
         )
         earlystop_callback = pl.callbacks.EarlyStopping(
-            monitor='val_f1',
+            monitor='val_f_beat',
             patience=200,
             mode='max',
         )
