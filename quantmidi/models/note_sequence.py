@@ -20,6 +20,8 @@ class NoteSequenceModel(pl.LightningModule):
         onset_encoding='shift-onehot',
         duration_encoding='raw',
         downbeats=False,
+        tempos=False,
+        reverse_link=False,
     ):
         """
         Model for quantization of MIDI note sequences.
@@ -43,6 +45,7 @@ class NoteSequenceModel(pl.LightningModule):
         self.onset_encoding = onset_encoding
         self.duration_encoding = duration_encoding
         self.downbeats = downbeats
+        self.reverse_link = reverse_link
         
         in_features = ModelUtils.get_encoding_in_features(features, pitch_encoding, onset_encoding, duration_encoding)
 
@@ -54,54 +57,6 @@ class NoteSequenceModel(pl.LightningModule):
             self.convs_downbeat = ConvBlock(in_features=in_features)
             self.grus_downbeat = GRUBlock(in_features=hidden_size+1)  # +1 for beat
             self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
-
-        # # ======== CNNBlock ========
-        # self.conv_layers = nn.Sequential(
-        #     nn.Conv2d(
-        #         in_channels=1, 
-        #         out_channels=hidden_size // 4, 
-        #         kernel_size=(kernel_size, in_features),
-        #         padding=(kernel_size // 2, 0),
-        #     ),
-        #     nn.BatchNorm2d(hidden_size // 4),
-        #     nn.ELU(),
-        #     nn.Dropout(p=dropout),
-        #     nn.Conv2d(
-        #         in_channels=hidden_size // 4,
-        #         out_channels=hidden_size // 2,
-        #         kernel_size=(kernel_size, 1),
-        #         padding=(kernel_size // 2, 0),
-        #     ),
-        #     nn.BatchNorm2d(hidden_size // 2),
-        #     nn.ELU(),
-        #     nn.Dropout(p=dropout),
-        #     nn.Conv2d(
-        #         in_channels=hidden_size // 2,
-        #         out_channels=hidden_size,
-        #         kernel_size=(kernel_size, 1),
-        #         padding=(kernel_size // 2, 0),
-        #     ),
-        #     nn.BatchNorm2d(hidden_size),
-        #     nn.ELU(),
-        # )
-
-        # # ========= GRUBlock ========
-        # self.gru = nn.GRU(
-        #     input_size=hidden_size,
-        #     hidden_size=hidden_size,
-        #     num_layers=gru_layers,
-        #     batch_first=True,
-        #     bidirectional=True,
-        #     dropout=dropout,
-        # )
-        # self.linear = nn.Linear(hidden_size * 2, hidden_size)
-
-        # # ======== OutputBlock ========
-        # self.output_layer = nn.Sequential(
-        #     nn.Dropout(p=dropout),
-        #     nn.Linear(hidden_size, 1),
-        #     nn.Sigmoid(),
-        # )
 
     def forward(self, x):
         # x.shape = (batch_size, max_length, len(features))
@@ -124,25 +79,14 @@ class NoteSequenceModel(pl.LightningModule):
             y_b = y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
             y_db = y_db.squeeze(dim=-1)  # (batch_size, sequence_length)
             
-            return y_b, y_db
+            if self.reverse_link:
+                return y_db, y_b
+            else:
+                return y_b, y_db
 
         else:
             return y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
 
-        # # ======== CNNBlock ========
-        # x = x.unsqueeze(1)  # (batch_size, 1, max_length, in_features)
-        # x = self.conv_layers(x)  # (batch_size, hidden_size, max_length, 1)
-        # x = x.squeeze(3).transpose(1, 2)  # (batch_size, max_length, hidden_size)
-
-        # # ========= GRUBlock ========
-        # x, _ = self.gru(x)  # (batch_size, max_length, hidden_size * 2)
-        # x = self.linear(x)  # (batch_size, max_length, hidden_size)
-
-        # # ======== OutputBlock ========
-        # x = self.output_layer(x)  # (batch_size, max_length, 1)
-
-        # return x.squeeze(2)  # (batch_size, max_length)
-    
     def training_step(self, batch, batch_idx):
         # data
         x, y_b, y_db, length = batch
@@ -359,4 +303,4 @@ class NoteSequenceModel(pl.LightningModule):
             patience=200,
             mode='max',
         )
-        return [checkpoint_callback, earlystop_callback]
+        return [checkpoint_callback]#, earlystop_callback]

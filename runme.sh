@@ -25,9 +25,10 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 experiment_name="Default"
 run_name='run_1'
 
-option="train"  # "train", "test" or "evaluate"
-model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
-resume_training="False"  # True or False | default: False
+option="evaluate"  # "train", "test" or "evaluate"
+model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+resume_training=0  # 1 or 0 | default: 0
+plot_results=0  # 1 or 0 | default: 0 | for evaluation only
 
 ## input features
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
@@ -43,8 +44,10 @@ pitch_shift_range="-12 12"  # default: [-12, 12]
 extra_note_prob=0.5  # 0.0 to 1.0 | default: 0.5 (extra note and missing note not added at the same time for a single piece)
 missing_note_prob=0.5  # 0.0 to 1.0 | default: 0.5
 
-# downbeats or not in note sequence model
-downbeats="True"  # "True" or "False" | default: "False"
+# options in note sequence model
+downbeats=1  # 1 or 0 | default: 0
+tempos=0  # 1 or 0 | default: 0
+reverse_link=1  # 1 or 0 | default: 0
 
 ## output data
 output_type="regression"  # "regression" or "classification" | default: "regression"
@@ -53,7 +56,7 @@ output_type="regression"  # "regression" or "classification" | default: "regress
 workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/f58595912c2b4245af6bce845b589ccd/checkpoints/epoch=95-val_f_beat=0.8872.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/0632d939be6e4c5780f37db3fe6c211d/checkpoints/epoch=28-val_f_beat=0.8873.ckpt"
 
 echo ">>> "$option" the model"
 
@@ -65,6 +68,7 @@ python3 quantmidi/main.py \
     --option $option \
     --model_type $model_type \
     --resume_training $resume_training \
+    --plot_results $plot_results \
     --features $features \
     --pitch_encoding $pitch_encoding \
     --onset_encoding $onset_encoding \
@@ -76,6 +80,8 @@ python3 quantmidi/main.py \
     --extra_note_prob $extra_note_prob \
     --missing_note_prob $missing_note_prob \
     --downbeats $downbeats \
+    --tempos $tempos \
+    --reverse_link $reverse_link \
     --output_type $output_type \
     --workers $workers \
     --gpus $gpus \

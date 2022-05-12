@@ -39,7 +39,7 @@ def DBN_beat_track(beat_act, downbeat_act):
     downbeats = downbeats[:, 0][downbeats[:, 1] == 1]
     return beats, downbeats
     
-def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True):
+def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True, merge_downbeats=True):
     """
     Post-processing of beat and downbeat tracking results for proposed model.
 
@@ -54,6 +54,7 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True):
     """
     N_notes = len(onsets)
 
+    # ========= Dynamic thresholding =========
     if dynamic_thresholding:
         # window length in seconds
         wlen_beats = (60. / min_bpm) * 4
@@ -87,7 +88,7 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True):
         beats = onsets[beat_probs > 0.5]
         downbeats = onsets[downbeat_probs > 0.5]
 
-    # remove beats that are too close to each other
+    # ========= remove beats that are too close to each other =========
     beats_min = beats[np.concatenate([[True], np.abs(np.diff(beats)) > tolerance * 2])]
     beats_max = beats[::-1][np.concatenate([[True], np.abs(np.diff(beats[::-1])) > tolerance * 2])][::-1]
     beats = np.mean([beats_min, beats_max], axis=0)
@@ -95,7 +96,16 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True):
     downbeats_max = downbeats[::-1][np.concatenate([[True], np.abs(np.diff(downbeats[::-1])) > tolerance * 2])][::-1]
     downbeats = np.mean([downbeats_min, downbeats_max], axis=0)
 
-    # fill up out-of-note beats by inter-beat intervals
+    # ========= merge downbeats to beats if they are not in beat prediction =========
+    if merge_downbeats:
+        beats_to_merge = []
+        for downbeat in downbeats:
+            if np.min(np.abs(beats - downbeat)) > tolerance * 2:
+                beats_to_merge.append(downbeat)
+        beats = np.concatenate([beats, beats_to_merge])
+        beats = sorted(beats)
+
+    # ========= fill up out-of-note beats by inter-beat intervals =========
     wlen = 5  # window length for getting neighboring inter-beat intervals (+- wlen)
     IBIs = np.diff(beats)
     beats_filled = []

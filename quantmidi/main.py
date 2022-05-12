@@ -7,6 +7,8 @@ import pytorch_lightning as pl
 pl.seed_everything(42)
 import pandas as pd
 import pickle
+import matplotlib.pyplot as plt
+import numpy as np
 from pathlib import Path
 
 from quantmidi.data.data_module import QuantMIDIDataModule
@@ -49,6 +51,8 @@ def train_or_test(args):
             onset_encoding=args.onset_encoding,
             duration_encoding=args.duration_encoding,
             downbeats=args.downbeats,
+            tempos=args.tempos,
+            reverse_link=args.reverse_link,
         )
     elif args.model_type == 'baseline':
         model = BaselineModel()
@@ -72,6 +76,8 @@ def train_or_test(args):
             'pitch_shift_range': ','.join(map(str, args.pitch_shift_range)),
             'extra_note_prob': args.extra_note_prob,
             'missing_note_prob': args.missing_note_prob,
+            'downbeats': args.downbeats,
+            'reverse_link': args.reverse_link,
             'output_type': args.output_type,
             'workers': args.workers,
             'gpus': args.gpus,
@@ -85,14 +91,16 @@ def train_or_test(args):
         log_every_n_steps=50,
         reload_dataloaders_every_n_epochs=True,
         gpus=args.gpus,
-        # resume_from_checkpoint=args.model_checkpoint if args.resume_training else None,
     )
 
     # ========= train/test =========
     if args.option == 'train':
-        trainer.fit(model, datamodule=datamodule)
+        if args.resume_training:
+            trainer.fit(model, datamodule=datamodule, ckpt_path=args.model_checkpoint)
+        else:
+            trainer.fit(model, datamodule=datamodule)
     elif args.option == 'test':
-        trainer.test(model, ckpt_path=args.model_checkpoint, datamodule=datamodule)
+        trainer.test(model, datamodule=datamodule, ckpt_path=args.model_checkpoint)
 
 def evaluate(args):
 
@@ -110,6 +118,8 @@ def evaluate(args):
             onset_encoding=args.onset_encoding,
             duration_encoding=args.duration_encoding,
             downbeats=args.downbeats,
+            tempos=args.tempos,
+            reverse_link=args.reverse_link,
         ).to(device)
     elif args.model_type == 'baseline':
         model = BaselineModel.load_from_checkpoint(args.model_checkpoint).to(device)
@@ -153,12 +163,24 @@ def evaluate(args):
             onsets = note_sequence[0,:,1].cpu().detach().numpy()
             beats_pred, downbeats_pred = post_process(onsets, y_b, y_db)
 
-            # # debug
-            # import matplotlib.pyplot as plt
-            # plt.figure(figsize=(20,10))
-            # plt.vlines(beats_pred[beats_pred < 30], 0, 1, color='r', linestyle='--')
-            # plt.vlines(beats_targ[beats_targ < 30], 1, 2, color='b', linestyle='--')
-            # plt.savefig('debug.png'); input()
+        if args.plot_results:
+            segment_length = 30.0
+            for seg in range(int(beats_targ[-1] / segment_length)+1):
+                l, r = seg * segment_length, (seg+1) * segment_length
+
+                beats_pred_segment = beats_pred[np.logical_and(beats_pred >= l, beats_pred <= r)]
+                beats_targ_segment = beats_targ[np.logical_and(beats_targ >= l, beats_targ <= r)]
+                downbeats_pred_segment = downbeats_pred[np.logical_and(downbeats_pred >= l, downbeats_pred <= r)]
+                downbeats_targ_segment = downbeats_targ[np.logical_and(downbeats_targ >= l, downbeats_targ <= r)]
+
+                plt.figure(figsize=(20,10))
+                plt.vlines(beats_pred_segment, 0, 1, color='b', linestyle='--')
+                plt.vlines(beats_targ_segment, 1, 2, color='r', linestyle='--')
+                plt.vlines(downbeats_targ_segment, 2, 3, color='r', linestyle='--')
+                plt.vlines(downbeats_pred_segment, 3, 4, color='b', linestyle='--')
+                plt.title('Beat/downbeat tracking results, test piece {}, segment {}'.format(row['performance_id'], seg))
+                plt.savefig('debug.png')
+                input('enter to continue')
 
         # evaluate using beat-level F-measure
         evals_beats.append(BeatEvaluation(beats_pred, beats_targ))
@@ -188,8 +210,9 @@ if __name__ == '__main__':
                         evaluate]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select one from [note_sequence, \
                         baseline, proposed]', default='proposed')
-    parser.add_argument('--resume_training', type=bool, help='Whether to resume training from the last \
-                        checkpoint', default=False)
+    parser.add_argument('--resume_training', type=int, help='Whether to resume training from the last \
+                        checkpoint', default=0)
+    parser.add_argument('--plot_results', type=int, help='Whether to plot results during evaluation', default=0)
 
     # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \
@@ -212,8 +235,11 @@ if __name__ == '__main__':
     parser.add_argument('--extra_note_prob', type=float, help='Probability of extra note', default=0.5)
     parser.add_argument('--missing_note_prob', type=float, help='Probability of missing note', default=0.5)
 
-    # downbeats or not in note sequence model
-    parser.add_argument('--downbeats', type=bool, help='Whether to output downbeats or not', default=False)
+    # options in note sequence model
+    parser.add_argument('--downbeats', type=int, help='Whether to output downbeats or not', default=0)
+    parser.add_argument('--tempos', type=int, help='Whether to output tempos or not', default=0)
+    parser.add_argument('--reverse_link', type=int, help='Whether to reverse link between beats and \
+                        downbeats or not', default=0)
 
     # output data comparison
     parser.add_argument('--output_type', type=str, help='Type of output for musical onsets and note values, \
