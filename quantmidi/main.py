@@ -8,7 +8,6 @@ pl.seed_everything(42)
 import pandas as pd
 import pickle
 from pathlib import Path
-from madmom.evaluation.beats import BeatEvaluation, BeatMeanEvaluation
 
 from quantmidi.data.data_module import QuantMIDIDataModule
 from quantmidi.models.note_sequence import NoteSequenceModel
@@ -86,7 +85,7 @@ def train_or_test(args):
         log_every_n_steps=50,
         reload_dataloaders_every_n_epochs=True,
         gpus=args.gpus,
-        # resume_from_checkpoint=args.model_checkpoint,
+        # resume_from_checkpoint=args.model_checkpoint if args.resume_training else None,
     )
 
     # ========= train/test =========
@@ -96,6 +95,8 @@ def train_or_test(args):
         trainer.test(model, ckpt_path=args.model_checkpoint, datamodule=datamodule)
 
 def evaluate(args):
+
+    from madmom.evaluation.beats import BeatEvaluation, BeatMeanEvaluation
 
     feature_folder = str(Path(args.workspace, 'features'))
     device = torch.device('cuda') if args.gpus else torch.device('cpu')
@@ -187,6 +188,8 @@ if __name__ == '__main__':
                         evaluate]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select one from [note_sequence, \
                         baseline, proposed]', default='proposed')
+    parser.add_argument('--resume_training', type=bool, help='Whether to resume training from the last \
+                        checkpoint', default=False)
 
     # input data comparison (features and encoding)
     parser.add_argument('--features', type=str, nargs='+', help='List of features to be used, select one or \

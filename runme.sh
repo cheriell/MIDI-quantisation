@@ -25,8 +25,9 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 experiment_name="Default"
 run_name='run_1'
 
-option="evaluate"  # "train", "test" or "evaluate"
-model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+option="train"  # "train", "test" or "evaluate"
+model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+resume_training="False"  # True or False | default: False
 
 ## input features
 features="pitch onset duration velocity"  # default: "pitch onset duration velocity"
@@ -49,10 +50,10 @@ downbeats="True"  # "True" or "False" | default: "False"
 output_type="regression"  # "regression" or "classification" | default: "regression"
 
 ## multiprocessing and data-parallel
-workers=0  # default: 8, debug: 0
+workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/f58595912c2b4245af6bce845b589ccd/checkpoints/epoch=51-val_f_beat=0.8797.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/f58595912c2b4245af6bce845b589ccd/checkpoints/epoch=95-val_f_beat=0.8872.ckpt"
 
 echo ">>> "$option" the model"
 
@@ -63,6 +64,7 @@ python3 quantmidi/main.py \
     --run_name $run_name \
     --option $option \
     --model_type $model_type \
+    --resume_training $resume_training \
     --features $features \
     --pitch_encoding $pitch_encoding \
     --onset_encoding $onset_encoding \

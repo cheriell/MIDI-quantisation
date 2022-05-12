@@ -121,10 +121,11 @@ class ProposedModel(pl.LightningModule):
         y_db = y_db.float()
         y_ts = y_ts.long()
         y_key = y_key.long()
+        length = length.long()
 
         # predict
         y_b_hat, y_db_hat, y_ts_hat, y_key_hat = self(x)
-
+        
         # mask out the padding part (avoid inplace operation)
         mask = torch.ones(y_b_hat.shape).to(y_b_hat.device)
         for i in range(y_b_hat.shape[0]):
@@ -133,14 +134,14 @@ class ProposedModel(pl.LightningModule):
         y_db_hat = y_db_hat * mask
         y_ts_hat = y_ts_hat * mask.unsqueeze(1)
         y_key_hat = y_key_hat * mask.unsqueeze(1)
-
+        
         # loss
         loss_b = F.binary_cross_entropy(y_b_hat, y_b)
         loss_db = F.binary_cross_entropy(y_db_hat, y_db)
         loss_ts = nn.NLLLoss()(y_ts_hat, y_ts)
         loss_key = nn.NLLLoss()(y_key_hat, y_key)
         loss = loss_b + loss_db + loss_ts + loss_key
-
+        
         # logs
         logs = {
             'train_loss': loss,
@@ -161,10 +162,11 @@ class ProposedModel(pl.LightningModule):
         y_db = y_db.float()
         y_ts = y_ts.long()
         y_key = y_key.long()
+        length = length.long()
 
         # predict
         y_b_hat, y_db_hat, y_ts_hat, y_key_hat = self(x)
-
+        
         # mask out the padding part
         for i in range(y_b_hat.shape[0]):
             y_b_hat[i, length[i]:] = 0
@@ -178,7 +180,7 @@ class ProposedModel(pl.LightningModule):
         loss_ts = nn.NLLLoss()(y_ts_hat, y_ts)
         loss_key = nn.NLLLoss()(y_key_hat, y_key)
         loss = loss_b + loss_db + loss_ts + loss_key
-
+        
         # metrics
         accs_b, precs_b, recs_b, fs_b = 0, 0, 0, 0
         accs_db, precs_db, recs_db, fs_db = 0, 0, 0, 0
@@ -240,7 +242,7 @@ class ProposedModel(pl.LightningModule):
             precs_weighted_key += prec_weighted_key
             recs_weighted_key += rec_weighted_key
             fs_weighted_key += f1_weighted_key
-
+            
         # log
         logs = {
             'val_loss': loss,

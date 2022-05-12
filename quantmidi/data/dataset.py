@@ -233,7 +233,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             # time signature denomitators
             time_signatures = annotations['time_signatures']
-            ts_denos = torch.zeros(len(note_sequence)).long()
+            ts_denos = torch.zeros(len(note_sequence))
 
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
@@ -244,7 +244,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
 
             # key signatures
             key_signatures = annotations['key_signatures']
-            key_numbers = torch.zeros(len(note_sequence)).long()
+            key_numbers = torch.zeros(len(note_sequence))
 
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
