@@ -77,6 +77,7 @@ def train_or_test(args):
             'extra_note_prob': args.extra_note_prob,
             'missing_note_prob': args.missing_note_prob,
             'downbeats': args.downbeats,
+            'tempos': args.tempos,
             'reverse_link': args.reverse_link,
             'output_type': args.output_type,
             'workers': args.workers,

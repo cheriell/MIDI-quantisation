@@ -20,8 +20,8 @@ class NoteSequenceModel(pl.LightningModule):
         onset_encoding='shift-onehot',
         duration_encoding='raw',
         downbeats=False,
-        tempos=False,
         reverse_link=False,
+        tempos=False,
     ):
         """
         Model for quantization of MIDI note sequences.
@@ -46,17 +46,32 @@ class NoteSequenceModel(pl.LightningModule):
         self.duration_encoding = duration_encoding
         self.downbeats = downbeats
         self.reverse_link = reverse_link
+        self.tempos = tempos
         
         in_features = ModelUtils.get_encoding_in_features(features, pitch_encoding, onset_encoding, duration_encoding)
 
-        self.convs_beat = ConvBlock(in_features=in_features)
-        self.grus_beat = GRUBlock(in_features=hidden_size)
-        self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+        if not self.tempos:
+            self.convs_beat = ConvBlock(in_features=in_features)
+            self.grus_beat = GRUBlock(in_features=hidden_size)
+            self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
 
-        if self.downbeats:
+            if self.downbeats:
+                self.convs_downbeat = ConvBlock(in_features=in_features)
+                self.grus_downbeat = GRUBlock(in_features=hidden_size+1)  # +1 for beat
+                self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+
+        else:
+            self.convs_beat = ConvBlock(in_features=in_features)
+            self.grus_beat = GRUBlock(in_features=hidden_size+2)  # +2 for downbeat and tempo
+            self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+
             self.convs_downbeat = ConvBlock(in_features=in_features)
-            self.grus_downbeat = GRUBlock(in_features=hidden_size+1)  # +1 for beat
+            self.grus_downbeat = GRUBlock(in_features=hidden_size+1)  # + for tempo
             self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+
+            self.convs_tempo = ConvBlock(in_features=in_features)
+            self.grus_tempo = GRUBlock(in_features=hidden_size)
+            self.out_tempo = LinearOutput(in_features=hidden_size, out_features=1, activation_type=None)
 
     def forward(self, x):
         # x.shape = (batch_size, max_length, len(features))
@@ -65,39 +80,64 @@ class NoteSequenceModel(pl.LightningModule):
         x_encoded = ModelUtils.encode_input_feature(x, self.features, self.pitch_encoding, self.onset_encoding, self.duration_encoding)
         # (batch_size, max_length, in_features)
 
-        x = self.convs_beat(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x = self.grus_beat(x)  # (batch_size, sequence_length, hidden_size)
-        y_b = self.out_beat(x)  # (batch_size, sequence_length, 1)
+        if not self.tempos:
 
-        if self.downbeats:
-            x = self.convs_downbeat(x_encoded)  # (batch_size, sequence_length, hidden_size)
-            x = torch.cat((x, y_b), dim=-1)  # (batch_size, sequence_length, hidden_size+1)
-            x = self.grus_downbeat(x)  # (batch_size, sequence_length, hidden_size)
-            y_db = self.out_downbeat(x)  # (batch_size, sequence_length, 1)
+            x = self.convs_beat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x = self.grus_beat(x)  # (batch_size, sequence_length, hidden_size)
+            y_b = self.out_beat(x)  # (batch_size, sequence_length, 1)
 
-            # squeeze and transpose
-            y_b = y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
-            y_db = y_db.squeeze(dim=-1)  # (batch_size, sequence_length)
-            
-            if self.reverse_link:
-                return y_db, y_b
+            if self.downbeats:
+                x = self.convs_downbeat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+                x = torch.cat((x, y_b), dim=-1)  # (batch_size, sequence_length, hidden_size+1)
+                x = self.grus_downbeat(x)  # (batch_size, sequence_length, hidden_size)
+                y_db = self.out_downbeat(x)  # (batch_size, sequence_length, 1)
+
+                # squeeze and transpose
+                y_b = y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
+                y_db = y_db.squeeze(dim=-1)  # (batch_size, sequence_length)
+                
+                if self.reverse_link:
+                    return y_db, y_b
+                else:
+                    return y_b, y_db
+
             else:
-                return y_b, y_db
+                return y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
 
         else:
-            return y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
+
+            x_convs_beat = self.convs_beat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_convs_downbeat = self.convs_downbeat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_convs_tempo = self.convs_tempo(x_encoded)  # (batch_size, sequence_length, hidden_size)
+
+            x_grus_tempo = self.grus_tempo(x_convs_tempo)  # (batch_size, sequence_length, hidden_size)
+            y_tempo = self.out_tempo(x_grus_tempo)  # (batch_size, sequence_length, 1)
+
+            x_grus_db_input = torch.cat((x_convs_downbeat, y_tempo), dim=-1)  # (batch_size, sequence_length, hidden_size+1)
+            x_grus_db = self.grus_downbeat(x_grus_db_input)  # (batch_size, sequence_length, hidden_size)
+            y_db = self.out_downbeat(x_grus_db)  # (batch_size, sequence_length, 1)
+
+            x_grus_b_input = torch.cat((x_convs_beat, y_db, y_tempo), dim=-1)  # (batch_size, sequence_length, hidden_size+2)
+            x_grus_b = self.grus_beat(x_grus_b_input)  # (batch_size, sequence_length, hidden_size)
+            y_b = self.out_beat(x_grus_b)  # (batch_size, sequence_length, 1)
+
+            return y_b.squeeze(-1), y_db.squeeze(-1), y_tempo.squeeze(-1)
+
 
     def training_step(self, batch, batch_idx):
         # data
-        x, y_b, y_db, length = batch
+        x, y_b, y_db, y_ibi, length = batch
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
+        y_ibi = y_ibi.float()
 
         # predict
         x = ModelUtils.input_feature_ablation(x, self.features)
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             y_b_hat, y_db_hat = self(x)
+        elif self.tempos:
+            y_b_hat, y_db_hat, y_ibi_hat = self(x)
         else:
             y_b_hat = self(x)
 
@@ -106,11 +146,13 @@ class NoteSequenceModel(pl.LightningModule):
         for i in range(y_b_hat.shape[0]):
             mask[i, length[i]:] = 0
         y_b_hat = y_b_hat * mask
-        if self.downbeats:
+        if self.downbeats or self.tempos:
             y_db_hat = y_db_hat * mask
+        if self.tempos:
+            y_ibi_hat = y_ibi_hat * mask
 
         # loss and logs
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             loss_b = F.binary_cross_entropy(y_b_hat, y_b)
             loss_db = F.binary_cross_entropy(y_db_hat, y_db)
             loss = loss_b + loss_db
@@ -118,6 +160,17 @@ class NoteSequenceModel(pl.LightningModule):
                 'train_loss': loss,
                 'train_loss_b': loss_b,
                 'train_loss_db': loss_db,
+            }
+        elif self.tempos:
+            loss_b = F.binary_cross_entropy(y_b_hat, y_b)
+            loss_db = F.binary_cross_entropy(y_db_hat, y_db)
+            loss_ibi = F.mse_loss(y_ibi_hat, y_ibi)
+            loss = loss_b + loss_db + loss_ibi
+            logs = {
+                'train_loss': loss,
+                'train_loss_b': loss_b,
+                'train_loss_db': loss_db,
+                'train_loss_ibi': loss_ibi,
             }
         else:
             loss = F.binary_cross_entropy(y_b_hat, y_b)
@@ -129,29 +182,39 @@ class NoteSequenceModel(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         # data
-        x, y_b, y_db, length = batch
+        x, y_b, y_db, y_ibi, length = batch
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
+        y_ibi = y_ibi.float()
 
         # predict
         x = ModelUtils.input_feature_ablation(x, self.features)
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             y_b_hat, y_db_hat = self(x)
+        elif self.tempos:
+            y_b_hat, y_db_hat, y_ibi_hat = self(x)
         else:
             y_b_hat = self(x)
 
         # mask out the padded part
         for i in range(y_b_hat.shape[0]):
             y_b_hat[i, length[i]:] = 0
-            if self.downbeats:
+            if self.downbeats or self.tempos:
                 y_db_hat[i, length[i]:] = 0
+            if self.tempos:
+                y_ibi_hat[i, length[i]:] = 0
 
         # loss
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             loss_b = F.binary_cross_entropy(y_b_hat, y_b)
             loss_db = F.binary_cross_entropy(y_db_hat, y_db)
             loss = loss_b + loss_db
+        elif self.tempos:
+            loss_b = F.binary_cross_entropy(y_b_hat, y_b)
+            loss_db = F.binary_cross_entropy(y_db_hat, y_db)
+            loss_ibi = F.mse_loss(y_ibi_hat, y_ibi)
+            loss = loss_b + loss_db + loss_ibi
         else:
             loss = F.binary_cross_entropy(y_b_hat, y_b)
 
@@ -189,7 +252,7 @@ class NoteSequenceModel(pl.LightningModule):
             'val_r_beat': recs_b / x.shape[0],
             'val_f_beat': fs_b / x.shape[0],
         }
-        if self.downbeats:
+        if self.downbeats or self.tempos:
             logs.update({
                 'val_loss_db': loss_db,
                 'val_acc_db': accs_db / x.shape[0],
@@ -197,35 +260,49 @@ class NoteSequenceModel(pl.LightningModule):
                 'val_r_db': recs_db / x.shape[0],
                 'val_f_db': fs_db / x.shape[0],
             })
+        if self.tempos:
+            logs.update({
+                'val_loss_ibi': loss_ibi,
+            })
         self.log_dict(logs, prog_bar=True)
 
         return {'val_loss': loss, 'logs': logs}
 
     def test_step(self, batch, batch_idx):
         # data
-        x, y_b, y_db, length = batch
+        x, y_b, y_db, y_ibi, length = batch
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
+        y_ibi = y_ibi.float()
 
         # predict
         x = ModelUtils.input_feature_ablation(x, self.features)
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             y_b_hat, y_db_hat = self(x)
+        elif self.tempos:
+            y_b_hat, y_db_hat, y_ibi_hat = self(x)
         else:
             y_b_hat = self(x)
 
         # mask out the padded part
         for i in range(y_b_hat.shape[0]):
             y_b_hat[i, length[i]:] = 0
-            if self.downbeats:
+            if self.downbeats or self.tempos:
                 y_db_hat[i, length[i]:] = 0
+            if self.tempos:
+                y_ibi_hat[i, length[i]:] = 0
 
         # loss
-        if self.downbeats:
+        if self.downbeats and not self.tempos:
             loss_b = F.binary_cross_entropy(y_b_hat, y_b)
             loss_db = F.binary_cross_entropy(y_db_hat, y_db)
             loss = loss_b + loss_db
+        elif self.tempos:
+            loss_b = F.binary_cross_entropy(y_b_hat, y_b)
+            loss_db = F.binary_cross_entropy(y_db_hat, y_db)
+            loss_ibi = F.mse_loss(y_ibi_hat, y_ibi)
+            loss = loss_b + loss_db + loss_ibi
         else:
             loss = F.binary_cross_entropy(y_b_hat, y_b)
 
@@ -263,13 +340,17 @@ class NoteSequenceModel(pl.LightningModule):
             'test_r_beat': recs_b / x.shape[0],
             'test_f_beat': fs_b / x.shape[0],
         }
-        if self.downbeats:
+        if self.downbeats or self.tempos:
             logs.update({
                 'test_loss_db': loss_db,
                 'test_acc_db': accs_db / x.shape[0],
                 'test_p_db': precs_db / x.shape[0],
                 'test_r_db': recs_db / x.shape[0],
                 'test_f_db': fs_db / x.shape[0],
+            })
+        if self.tempos:
+            logs.update({
+                'test_loss_ibi': loss_ibi,
             })
         self.log_dict(logs, prog_bar=True)
 

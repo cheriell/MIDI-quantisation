@@ -347,6 +347,8 @@ class LinearOutput(nn.Module):
     def __init__(self, in_features, out_features, activation_type='sigmoid'):
         super().__init__()
 
+        self.activation_type = activation_type
+
         self.dropout = nn.Dropout(p=dropout)
         self.linear = nn.Linear(in_features, out_features)
         if activation_type == 'sigmoid':
@@ -359,6 +361,7 @@ class LinearOutput(nn.Module):
 
         x = self.dropout(x)  # (batch_size, sequence_length, in_features)
         x = self.linear(x)  # (batch_size, sequence_length, out_features)
-        x = self.activation(x)  # (batch_size, sequence_length, out_features)
+        if self.activation_type:
+            x = self.activation(x)  # (batch_size, sequence_length, out_features)
 
         return x

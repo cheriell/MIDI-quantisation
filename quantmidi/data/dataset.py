@@ -120,26 +120,35 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             beats = annotations['beats']
             downbeats = annotations['downbeats']
 
-            # onset to beat/downbeat dict
+            # onset to beat/downbeat/ibi dict
             end_time = max(beats[-1], note_sequence[-1][1] + note_sequence[-1][2]) + 1.0
             onset2beat = torch.zeros(int(torch.ceil(end_time / resolution)))
             onset2downbeat = torch.zeros(int(torch.ceil(end_time / resolution)))
-            for beat in beats:
+            onset2ibi = torch.zeros(int(torch.ceil(end_time / resolution)))
+            for idx, beat in enumerate(beats):
                 l = torch.round((beat - tolerance) / resolution).to(int)
                 r = torch.round((beat + tolerance) / resolution).to(int)
                 onset2beat[l:r+1] = 1.0
+
+                ibi = beats[idx+1] - beat if idx+1 < len(beats) else beats[-1] - beats[-2]
+                l = torch.round(beat / resolution).to(int) if idx > 0 else 0
+                r = torch.round((beat + ibi) / resolution).to(int) if idx+1 < len(beats) else len(onset2ibi)
+                onset2ibi[l:r+1] = ibi
+
             for downbeat in downbeats:
                 l = torch.round((downbeat - tolerance) / resolution).to(int)
                 r = torch.round((downbeat + tolerance) / resolution).to(int)
                 onset2downbeat[l:r+1] = 1.0
             
-            # get beat/downbeat probabilities at note onsets
+            # get beat/downbeat probabilities and ibis at note onsets
             beat_probs = torch.zeros(len(note_sequence), dtype=torch.float32)
             downbeat_probs = torch.zeros(len(note_sequence), dtype=torch.float32)
+            ibis = torch.zeros(len(note_sequence), dtype=torch.float32)
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
                 beat_probs[i] = onset2beat[torch.round(onset / resolution).to(int)]
                 downbeat_probs[i] = onset2downbeat[torch.round(onset / resolution).to(int)]
+                ibis[i] = onset2ibi[torch.round(onset / resolution).to(int)]
 
             # ============ pad if length is shorter than max_length ============
             length = len(note_sequence)
@@ -147,8 +156,9 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 note_sequence = torch.cat([note_sequence, torch.zeros((max_length_note_sequence - len(note_sequence), 4))])
                 beat_probs = torch.cat([beat_probs, torch.zeros(max_length_note_sequence - len(beat_probs))])
                 downbeat_probs = torch.cat([downbeat_probs, torch.zeros(max_length_note_sequence - len(downbeat_probs))])
+                ibis = torch.cat([ibis, torch.zeros(max_length_note_sequence - len(ibis))])
 
-            return note_sequence, beat_probs, downbeat_probs, length
+            return note_sequence, beat_probs, downbeat_probs, ibis, length
 
         def get_data_baseline(note_sequence, annotations):
             # ========== get model input ==========

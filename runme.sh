@@ -25,7 +25,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 experiment_name="Default"
 run_name='run_1'
 
-option="evaluate"  # "train", "test" or "evaluate"
+option="train"  # "train", "test" or "evaluate"
 model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 resume_training=0  # 1 or 0 | default: 0
 plot_results=0  # 1 or 0 | default: 0 | for evaluation only
@@ -46,7 +46,7 @@ missing_note_prob=0.5  # 0.0 to 1.0 | default: 0.5
 
 # options in note sequence model
 downbeats=1  # 1 or 0 | default: 0
-tempos=0  # 1 or 0 | default: 0
+tempos=1  # 1 or 0 | default: 0
 reverse_link=1  # 1 or 0 | default: 0
 
 ## output data
@@ -56,7 +56,7 @@ output_type="regression"  # "regression" or "classification" | default: "regress
 workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/0632d939be6e4c5780f37db3fe6c211d/checkpoints/epoch=28-val_f_beat=0.8873.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/0632d939be6e4c5780f37db3fe6c211d/checkpoints/last.ckpt"
 
 echo ">>> "$option" the model"
 

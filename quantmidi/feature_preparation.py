@@ -16,37 +16,6 @@ import shutil
 from quantmidi.data.data_utils import DataUtils
 
 
-def main():
-
-    parser = argparse.ArgumentParser(description='Prepare dataset for training')
-    parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders in the order \
-                        of ASAP, A_MAPS, CPM, ACPAS')
-    parser.add_argument('--feature_folder', type=str, help='Path to the feature folder')
-    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing, 0 for not using \
-                        multiprocessing, minus for using default number of workers', default=mp.cpu_count())
-    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
-    args = parser.parse_args()
-
-    # ========= input check =========
-    # dataset_folder
-    # feature_folder
-    # workers
-    if args.workers < 0:
-        args.workers = mp.cpu_count()
-        print('INFO: Using default number of workers: {}'.format(args.workers))
-    if args.workers > mp.cpu_count():
-        args.workers = mp.cpu_count()
-        print('INFO: Number of workers is greater than the number of CPU cores, setting to {}'.format(args.workers))
-    # verbose
-
-    # ========= feature preparation =========
-    featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
-    # featprep.prepare_metadata()
-    # featprep.print_statistics()
-    featprep.load_metadata()
-    featprep.prepare_features()
-
-
 class FeaturePreparation():
 
     def __init__(self, dataset_folder, feature_folder, workers, verbose):
@@ -290,4 +259,31 @@ class FeaturePreparation():
         
 
 if __name__ == '__main__':
-    main()
+    
+    parser = argparse.ArgumentParser(description='Prepare dataset for training')
+    parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders in the order \
+                        of ASAP, A_MAPS, CPM, ACPAS')
+    parser.add_argument('--feature_folder', type=str, help='Path to the feature folder')
+    parser.add_argument('--workers', type=int, help='Number of workers for parallel processing, 0 for not using \
+                        multiprocessing, minus for using default number of workers', default=mp.cpu_count())
+    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
+    args = parser.parse_args()
+
+    # ========= input check =========
+    # dataset_folder
+    # feature_folder
+    # workers
+    if args.workers < 0:
+        args.workers = mp.cpu_count()
+        print('INFO: Using default number of workers: {}'.format(args.workers))
+    if args.workers > mp.cpu_count():
+        args.workers = mp.cpu_count()
+        print('INFO: Number of workers is greater than the number of CPU cores, setting to {}'.format(args.workers))
+    # verbose
+
+    # ========= feature preparation =========
+    featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
+    # featprep.prepare_metadata()
+    # featprep.print_statistics()
+    featprep.load_metadata()
+    featprep.prepare_features()
