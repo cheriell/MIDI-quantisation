@@ -152,6 +152,13 @@ def evaluate(args):
             onsets = note_sequence[0,:,1].cpu().detach().numpy()
             beats_pred, downbeats_pred = post_process(onsets, y_b, y_db)
 
+            # # debug
+            # import matplotlib.pyplot as plt
+            # plt.figure(figsize=(20,10))
+            # plt.vlines(beats_pred[beats_pred < 30], 0, 1, color='r', linestyle='--')
+            # plt.vlines(beats_targ[beats_targ < 30], 1, 2, color='b', linestyle='--')
+            # plt.savefig('debug.png'); input()
+
         # evaluate using beat-level F-measure
         evals_beats.append(BeatEvaluation(beats_pred, beats_targ))
         evals_downbeats.append(BeatEvaluation(downbeats_pred, downbeats_targ, downbeats=True))

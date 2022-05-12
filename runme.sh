@@ -52,7 +52,7 @@ output_type="regression"  # "regression" or "classification" | default: "regress
 workers=0  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/f58595912c2b4245af6bce845b589ccd/checkpoints/last.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/f58595912c2b4245af6bce845b589ccd/checkpoints/epoch=39-val_f_beat=0.8724.ckpt"
 
 echo ">>> "$option" the model"
 
