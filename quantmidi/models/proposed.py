@@ -41,7 +41,7 @@ class ProposedModel(pl.LightningModule):
         # tempo
         self.convs_tempo = ConvBlock(in_features=in_features)
         self.grus_tempo = GRUBlock(in_features=hidden_size)
-        self.out_tempo = LinearOutput(in_features=hidden_size, out_features=1, activation_type=None)
+        self.out_tempo = LinearOutput(in_features=hidden_size, out_features=1, activation_type='softplus')
         
         # time signatures
         self.conv_time_nume = ConvBlock(in_features=in_features)
@@ -429,13 +429,14 @@ class LinearOutput(nn.Module):
             self.activation = nn.Sigmoid()
         elif activation_type == 'softmax':
             self.activation = nn.LogSoftmax(dim=2)
+        elif activation_type == 'softplus':
+            self.activation = nn.Softplus()
 
     def forward(self, x):
         # x: (batch_size, sequence_length, in_features)
 
         x = self.dropout(x)  # (batch_size, sequence_length, in_features)
         x = self.linear(x)  # (batch_size, sequence_length, out_features)
-        if self.activation_type:
-            x = self.activation(x)  # (batch_size, sequence_length, out_features)
+        x = self.activation(x)  # (batch_size, sequence_length, out_features)
 
         return x

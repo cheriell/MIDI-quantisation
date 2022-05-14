@@ -226,12 +226,12 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             time2beat = torch.zeros(int(torch.ceil(end_time / resolution)))
             time2downbeat = torch.zeros(int(torch.ceil(end_time / resolution)))
             time2ibi = torch.zeros(int(torch.ceil(end_time / resolution)))
-            for beat in beats:
+            for idx, beat in enumerate(beats):
                 l = torch.round((beat - tolerance) / resolution).to(int)
                 r = torch.round((beat + tolerance) / resolution).to(int)
                 time2beat[l:r+1] = 1.0
 
-                ibi = beats[idx+1] - beat if idx+1 < len(beats) else beats[-1] - beats[-2]
+                ibi = beats[idx+1] - beats[idx] if idx+1 < len(beats) else beats[-1] - beats[-2]
                 l = torch.round((beat - tolerance) / resolution).to(int) if idx > 0 else 0
                 r = torch.round((beat + ibi) / resolution).to(int) if idx+1 < len(beats) else len(time2ibi)
                 time2ibi[l:r+1] = ibi
@@ -259,13 +259,10 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
                 for ts in time_signatures:
-                    if ts[0] >= onset - tolerance:
-                        if int(ts[1]) in tsNume2Index.keys():
-                            ts_numes[i] = tsNume2Index[int(ts[1])]
-                        else:
-                            ts_numes[i] = 0
-                        ts_denos[i] = tsDeno2Index[int(ts[2])]
+                    if ts[0] > onset + tolerance:
                         break
+                    ts_numes[i] = tsNume2Index[int(ts[1])] if int(ts[1]) in tsNume2Index.keys() else 0
+                    ts_denos[i] = tsDeno2Index[int(ts[2])]
 
             # key signatures
             key_signatures = annotations['key_signatures']
@@ -274,9 +271,9 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             for i in range(len(note_sequence)):
                 onset = note_sequence[i][1]
                 for ks in key_signatures:
-                    if ks[0] >= onset - tolerance:
-                        key_numbers[i] = ks[1] % keyVocabSize
+                    if ks[0] > onset + tolerance:
                         break
+                    key_numbers[i] = ks[1] % keyVocabSize
 
             # ============ pad if length is shorter than max_length ============
             length = len(note_sequence)

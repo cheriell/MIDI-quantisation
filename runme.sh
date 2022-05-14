@@ -22,7 +22,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="tests"
+experiment_name="Defaults"
 run_name='run_2'
 
 option="train"  # "train", "test" or "evaluate"
@@ -53,8 +53,8 @@ reverse_link=1  # 1 or 0 | default: 0
 output_type="regression"  # "regression" or "classification" | default: "regression"
 
 ## multiprocessing and data-parallel
-workers=4  # default: 8, debug: 0
-gpus=4  # default: 4, debug: 1
+workers=0  # default: 8, debug: 0
+gpus=1  # default: 4, debug: 1
 
 model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
 
