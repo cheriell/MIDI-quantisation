@@ -185,19 +185,19 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             # =========== get model output ===========
             # list of beat probs in torch tensor.
             if self.split == 'train':
-                beat_act, downbeat_act, ts_denos, key_numbers, length = DataUtils.get_baseline_model_output_data(
+                beat_act, downbeat_act, length = DataUtils.get_baseline_model_output_data(
                     note_sequence, 
                     annotations,
                     sample_segment=True,
                 )
             elif self.split == 'valid':
-                beat_act, downbeat_act, ts_denos, key_numbers, length = DataUtils.get_baseline_model_output_data(
+                beat_act, downbeat_act, length = DataUtils.get_baseline_model_output_data(
                     note_sequence,
                     annotations,
                     sample_segment=True,
                 )
             
-            return note_sequence, beat_act, downbeat_act, ts_denos, key_numbers, length
+            return note_sequence, beat_act, downbeat_act, length
 
         def get_data_proposed(note_sequence, annotations):
             # ========== get model input ==========

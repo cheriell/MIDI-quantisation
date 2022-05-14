@@ -185,38 +185,12 @@ class DataUtils():
         downbeat_act = torch.zeros(max_length_pr).float()
 
         for beat in beats:
-            left = int(min(length, max(0, torch.round((beat - t0 - tolerance) / resolution))))
-            right = int(min(length, max(0, torch.round((beat - t0 + tolerance) / resolution))))
-            beat_act[left:right] = 1.0
+            left = int(min(length, max(0, torch.round((beat - t0) / resolution) - 1)))
+            right = int(min(length, max(0, torch.round((beat - t0) / resolution) + 1)))
+            beat_act[left:right+1] = 1.0
         for downbeat in downbeats:
-            left = int(min(length, max(0, torch.round((downbeat - t0 - tolerance) / resolution))))
-            right = int(min(length, max(0, torch.round((downbeat - t0 + tolerance) / resolution))))
-            downbeat_act[left:right] = 1.0
+            left = int(min(length, max(0, torch.round((downbeat - t0) / resolution) - 1)))
+            right = int(min(length, max(0, torch.round((downbeat - t0) / resolution) + 1)))
+            downbeat_act[left:right+1] = 1.0
 
-        # get time signature denominators
-        time_signatures = annotations['time_signatures']
-        ts_denos = torch.zeros(max_length_pr).long()
-
-        for i in range(len(time_signatures)):
-            left = int(min(length, max(0, torch.round((time_signatures[i,0] - t0) / resolution))))
-            if i+1 < len(time_signatures):
-                right = int(min(length, max(0, torch.round((time_signatures[i+1,0] - t0) / resolution))))
-            else:
-                right = length
-
-            ts_denos[left:right] = tsDeno2Index[int(time_signatures[i,2])]
-
-        # get key signature outputs
-        key_signatures = annotations['key_signatures']
-        key_numbers = torch.zeros(max_length_pr).long()
-
-        for i in range(len(key_signatures)):
-            left = int(min(length, max(0, torch.round((key_signatures[i,0] - t0) / resolution))))
-            if i+1 < len(key_signatures):
-                right = int(min(length, max(0, torch.round((key_signatures[i+1,0] - t0) / resolution))))
-            else:
-                right = length
-                
-            key_numbers[left:right] = key_signatures[i,1] % keyVocabSize
-
-        return beat_act, downbeat_act, ts_denos, key_numbers, length
+        return beat_act, downbeat_act, length

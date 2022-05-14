@@ -95,12 +95,10 @@ class BaselineModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # data
-        x, y_b, y_db, y_ts, y_key, length = batch
+        x, y_b, y_db, length = batch
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
-        y_ts = y_ts.long()
-        y_key = y_key.long()
 
         # predict
         y_b_hat, y_db_hat = self(x, length)
@@ -130,12 +128,10 @@ class BaselineModel(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         # data
-        x, y_b, y_db, y_ts, y_key, length = batch
+        x, y_b, y_db, length = batch
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
-        y_ts = y_ts.long()
-        y_key = y_key.long()
 
         # predict
         y_b_hat, y_db_hat = self(x, length)
