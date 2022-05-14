@@ -5,7 +5,6 @@ import pytorch_lightning as pl
 import numpy as np
 
 from quantmidi.models.model_utils import ModelUtils
-from quantmidi.data.constants import keyVocabSize, tsVocabSize
 
 learning_rate = 1e-3
 dropout = 0.1

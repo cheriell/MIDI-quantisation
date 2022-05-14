@@ -220,8 +220,10 @@ class NoteSequenceModel(pl.LightningModule):
 
         # metrics
         accs_b, precs_b, recs_b, fs_b = 0, 0, 0, 0
-        if self.downbeats:
+        if self.downbeats or self.tempos:
             accs_db, precs_db, recs_db, fs_db = 0, 0, 0, 0
+        if self.tempos:
+            ave_error_rate_ibi = 0
 
         for i in range(x.shape[0]):
             y_b_hat_i = torch.round(y_b_hat[i, :length[i]])
@@ -233,7 +235,7 @@ class NoteSequenceModel(pl.LightningModule):
             recs_b += rec_b
             fs_b += f_b
 
-            if self.downbeats:
+            if self.downbeats or self.tempos:
                 y_db_hat_i = torch.round(y_db_hat[i, :length[i]])
                 y_db_i = y_db[i, :length[i]]
                 acc_db, prec_db, rec_db, f_db = ModelUtils.f_measure_framewise(y_db_i, y_db_hat_i)
@@ -242,6 +244,13 @@ class NoteSequenceModel(pl.LightningModule):
                 precs_db += prec_db
                 recs_db += rec_db
                 fs_db += f_db
+
+            if self.tempos:
+                y_ibi_hat_i = y_ibi_hat[i, :length[i]]
+                y_ibi_i = y_ibi[i, :length[i]]
+
+                error_rate_ibi = torch.abs((y_ibi_hat_i / y_ibi_i).log())
+                ave_error_rate_ibi += error_rate_ibi
 
         # log
         logs = {
@@ -263,6 +272,7 @@ class NoteSequenceModel(pl.LightningModule):
         if self.tempos:
             logs.update({
                 'val_loss_ibi': loss_ibi,
+                'val_ave_error_rate_ibi': ave_error_rate_ibi / x.shape[0],
             })
         self.log_dict(logs, prog_bar=True)
 
@@ -308,8 +318,10 @@ class NoteSequenceModel(pl.LightningModule):
 
         # metrics
         accs_b, precs_b, recs_b, fs_b = 0, 0, 0, 0
-        if self.downbeats:
+        if self.downbeats or self.tempos:
             accs_db, precs_db, recs_db, fs_db = 0, 0, 0, 0
+        if self.tempos:
+            ave_error_rate_ibi = 0
 
         for i in range(x.shape[0]):
             y_b_hat_i = torch.round(y_b_hat[i, :length[i]])
@@ -321,7 +333,7 @@ class NoteSequenceModel(pl.LightningModule):
             recs_b += rec_b
             fs_b += f_b
 
-            if self.downbeats:
+            if self.downbeats or self.tempos:
                 y_db_hat_i = torch.round(y_db_hat[i, :length[i]])
                 y_db_i = y_db[i, :length[i]]
                 acc_db, prec_db, rec_db, f_db = ModelUtils.f_measure_framewise(y_db_i, y_db_hat_i)
@@ -330,6 +342,13 @@ class NoteSequenceModel(pl.LightningModule):
                 precs_db += prec_db
                 recs_db += rec_db
                 fs_db += f_db
+
+            if self.tempos:
+                y_ibi_hat_i = y_ibi_hat[i, :length[i]]
+                y_ibi_i = y_ibi[i, :length[i]]
+
+                error_rate_ibi = torch.mean(torch.abs(y_ibi_hat_i - y_ibi_i) / y_ibi_i)
+                ave_error_rate_ibi += error_rate_ibi
 
         # log
         logs = {
@@ -351,6 +370,7 @@ class NoteSequenceModel(pl.LightningModule):
         if self.tempos:
             logs.update({
                 'test_loss_ibi': loss_ibi,
+                'test_ave_error_rate_ibi': ave_error_rate_ibi / x.shape[0],
             })
         self.log_dict(logs, prog_bar=True)
 

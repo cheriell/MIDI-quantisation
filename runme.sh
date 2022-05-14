@@ -23,10 +23,10 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training/Testing ===============
 
 experiment_name="Default"
-run_name='run_1'
+run_name='run_2'
 
 option="train"  # "train", "test" or "evaluate"
-model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 resume_training=0  # 1 or 0 | default: 0
 plot_results=0  # 1 or 0 | default: 0 | for evaluation only
 
@@ -56,7 +56,7 @@ output_type="regression"  # "regression" or "classification" | default: "regress
 workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/0632d939be6e4c5780f37db3fe6c211d/checkpoints/last.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
 
 echo ">>> "$option" the model"
 
