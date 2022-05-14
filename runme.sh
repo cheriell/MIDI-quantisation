@@ -22,7 +22,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="Default"
+experiment_name="tests"
 run_name='run_2'
 
 option="train"  # "train", "test" or "evaluate"

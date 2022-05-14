@@ -260,7 +260,10 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 onset = note_sequence[i][1]
                 for ts in time_signatures:
                     if ts[0] >= onset - tolerance:
-                        ts_numes[i] = tsNume2Index[int(ts[1])]
+                        if int(ts[1]) in tsNume2Index.keys():
+                            ts_numes[i] = tsNume2Index[int(ts[1])]
+                        else:
+                            ts_numes[i] = 0
                         ts_denos[i] = tsDeno2Index[int(ts[2])]
                         break
 
