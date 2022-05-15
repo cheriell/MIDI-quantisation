@@ -234,8 +234,11 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 ibi = beats[idx+1] - beats[idx] if idx+1 < len(beats) else beats[-1] - beats[-2]
                 l = torch.round((beat - tolerance) / resolution).to(int) if idx > 0 else 0
                 r = torch.round((beat + ibi) / resolution).to(int) if idx+1 < len(beats) else len(time2ibi)
-                time2ibi[l:r+1] = ibi
-
+                if ibi > 4:
+                    # reset ibi to 0 if it's too long, index 0 will be ignored during training
+                    ibi = torch.tensor(0)
+                time2ibi[l:r+1] = torch.round(ibi / resolution)
+            
             for downbeat in downbeats:
                 l = torch.round((downbeat - tolerance) / resolution).to(int)
                 r = torch.round((downbeat + tolerance) / resolution).to(int)
@@ -250,7 +253,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 beat_probs[i] = time2beat[torch.round(onset / resolution).to(int)]
                 downbeat_probs[i] = time2downbeat[torch.round(onset / resolution).to(int)]
                 ibis[i] = time2ibi[torch.round(onset / resolution).to(int)]
-
+            
             # time signature
             time_signatures = annotations['time_signatures']
             ts_numes = torch.zeros(len(note_sequence))
@@ -262,8 +265,8 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                     if ts[0] > onset + tolerance:
                         break
                     ts_numes[i] = tsNume2Index[int(ts[1])] if int(ts[1]) in tsNume2Index.keys() else 0
-                    ts_denos[i] = tsDeno2Index[int(ts[2])]
-
+                    ts_denos[i] = tsDeno2Index[int(ts[2])] if int(ts[2]) in tsDeno2Index.keys() else 0
+            
             # key signatures
             key_signatures = annotations['key_signatures']
             key_numbers = torch.zeros(len(note_sequence))
@@ -285,7 +288,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 ts_numes = torch.cat([ts_numes, torch.zeros(max_length_note_sequence - len(ts_numes))])
                 ts_denos = torch.cat([ts_denos, torch.zeros(max_length_note_sequence - len(ts_denos))])
                 key_numbers = torch.cat([key_numbers, torch.zeros(max_length_note_sequence - len(key_numbers))])
-
+            
             return note_sequence, beat_probs, downbeat_probs, ibis, ts_numes, ts_denos, key_numbers, length
 
         if self.model_type == 'note_sequence':

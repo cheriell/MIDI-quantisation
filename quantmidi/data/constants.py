@@ -4,16 +4,17 @@
 ## quantisation resolution
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
+ibiVocab = int(4 / resolution) + 1  # vocabulary size for ibi: 4s = 4/0.01s + 1
 
 # =========== time signature definitions ===========
-tsDenominators = [2, 4, 8, 16, 32]
-tsDeno2Index = {2: 0, 4: 1, 8: 2, 16: 3, 32: 4}
-tsIndex2Deno = {0: 2, 1: 4, 2: 8, 3: 16, 4: 32}
+tsDenominators = [0, 2, 4, 8]  # 0 for others
+tsDeno2Index = {0: 0, 2: 1, 4: 2, 8: 3}
+tsIndex2Deno = {0: 0, 1: 2, 2: 4, 3: 8}
 tsDenoVocabSize = len(tsDenominators)
 
-tsNumerators = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]  # 0 for other time signatures
-tsNume2Index = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16}
-tsIndex2Nume = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16}
+tsNumerators = [0, 2, 3, 4, 6]  # 0 for others
+tsNume2Index = {0: 0, 2: 1, 3: 2, 4: 3, 6: 4}
+tsIndex2Nume = {0: 0, 1: 2, 2: 3, 3: 4, 4: 6}
 tsNumeVocabSize = len(tsNumerators)
 
 # =========== key signature definitions ==========

@@ -4,7 +4,12 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from quantmidi.models.model_utils import ModelUtils
-from quantmidi.data.constants import tsNumeVocabSize, tsDenoVocabSize, keyVocabSize
+from quantmidi.data.constants import (
+    ibiVocab,
+    tsNumeVocabSize, 
+    tsDenoVocabSize, 
+    keyVocabSize,
+)
 
 learning_rate = 1e-3
 dropout = 0.15
@@ -30,18 +35,18 @@ class ProposedModel(pl.LightningModule):
 
         # beats
         self.convs_beat = ConvBlock(in_features=in_features)
-        self.grus_beat = GRUBlock(in_features=hidden_size+2+tsDenoVocabSize+keyVocabSize) # for downbeat, tempo, time_deno, key
+        self.grus_beat = GRUBlock(in_features=hidden_size+1+ibiVocab+tsDenoVocabSize+keyVocabSize) # for downbeat, tempo, time_deno, key
         self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
 
         # downbeats
         self.convs_downbeat = ConvBlock(in_features=in_features)
-        self.grus_downbeat = GRUBlock(in_features=hidden_size+1+tsNumeVocabSize+keyVocabSize)  # +3 for tempo, time_nume, key
+        self.grus_downbeat = GRUBlock(in_features=hidden_size+ibiVocab+tsNumeVocabSize+keyVocabSize)  # +3 for tempo, time_nume, key
         self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
 
         # tempo
         self.convs_tempo = ConvBlock(in_features=in_features)
         self.grus_tempo = GRUBlock(in_features=hidden_size)
-        self.out_tempo = LinearOutput(in_features=hidden_size, out_features=1, activation_type='softplus')
+        self.out_tempo = LinearOutput(in_features=hidden_size, out_features=ibiVocab, activation_type='softmax')
         
         # time signatures
         self.conv_time_nume = ConvBlock(in_features=in_features)
@@ -67,7 +72,7 @@ class ProposedModel(pl.LightningModule):
         # tempo
         x_convs_tempo = self.convs_tempo(x_encoded)  # (batch_size, sequence_length, hidden_size)
         x_grus_tempo = self.grus_tempo(x_convs_tempo)  # (batch_size, sequence_length, hidden_size)
-        y_tempo = self.out_tempo(x_grus_tempo)  # (batch_size, sequence_length, 1)
+        y_tempo = self.out_tempo(x_grus_tempo)  # (batch_size, sequence_length, ibiVocab)
 
         # time signatures
         x_conv_time_nume = self.conv_time_nume(x_encoded)  # (batch_size, sequence_length, hidden_size)
@@ -98,7 +103,7 @@ class ProposedModel(pl.LightningModule):
         # squeeze and transpose
         y_b = y_b.squeeze(dim=-1)  # (batch_size, sequence_length)
         y_db = y_db.squeeze(dim=-1)  # (batch_size, sequence_length)
-        y_tempo = y_tempo.squeeze(dim=-1)  # (batch_size, sequence_length)
+        y_tempo = y_tempo.transpose(1, 2)  # (batch_size, ibiVocab, sequence_length)
         y_time_nume = y_time_nume.transpose(1, 2)  # (batch_size, tsNumeVocabSize, sequence_length)
         y_time_deno = y_time_deno.transpose(1, 2)  # (batch_size, tsDenoVocabSize, sequence_length)
         y_key = y_key.transpose(1, 2)  # (batch_size, keyVocabSize, sequence_length)
@@ -141,7 +146,7 @@ class ProposedModel(pl.LightningModule):
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
-        y_ibi = y_ibi.float()
+        y_ibi = y_ibi.long()
         y_tn = y_tn.long()
         y_td = y_td.long()
         y_key = y_key.long()
@@ -156,7 +161,7 @@ class ProposedModel(pl.LightningModule):
             mask[i, length[i]:] = 0
         y_b_hat = y_b_hat * mask
         y_db_hat = y_db_hat * mask
-        y_ibi_hat = y_ibi_hat * mask
+        y_ibi_hat = y_ibi_hat * mask.unsqueeze(1)
         y_tn_hat = y_tn_hat * mask.unsqueeze(1)
         y_td_hat = y_td_hat * mask.unsqueeze(1)
         y_key_hat = y_key_hat * mask.unsqueeze(1)
@@ -164,11 +169,11 @@ class ProposedModel(pl.LightningModule):
         # loss
         loss_b = F.binary_cross_entropy(y_b_hat, y_b)
         loss_db = F.binary_cross_entropy(y_db_hat, y_db)
-        loss_ibi = F.mse_loss(y_ibi_hat, y_ibi)
-        loss_tn = nn.NLLLoss()(y_tn_hat, y_tn)
-        loss_td = nn.NLLLoss()(y_td_hat, y_td)
+        loss_ibi = nn.NLLLoss(ignore_index=0)(y_ibi_hat, y_ibi)
+        loss_tn = nn.NLLLoss(ignore_index=0)(y_tn_hat, y_tn)
+        loss_td = nn.NLLLoss(ignore_index=0)(y_td_hat, y_td)
         loss_key = nn.NLLLoss()(y_key_hat, y_key)
-        loss = loss_b + loss_db + loss_ibi + loss_tn + loss_td + loss_key
+        loss = loss_b + loss_db + loss_ibi + 0.2 * loss_tn + 0.2 * loss_td + loss_key
         
         # logs
         logs = {
@@ -190,7 +195,7 @@ class ProposedModel(pl.LightningModule):
         x = x.float()
         y_b = y_b.float()
         y_db = y_db.float()
-        y_ibi = y_ibi.float()
+        y_ibi = y_ibi.long()
         y_tn = y_tn.long()
         y_td = y_td.long()
         y_key = y_key.long()
@@ -203,7 +208,7 @@ class ProposedModel(pl.LightningModule):
         for i in range(y_b_hat.shape[0]):
             y_b_hat[i, length[i]:] = 0
             y_db_hat[i, length[i]:] = 0
-            y_ibi_hat[i, length[i]:] = 0
+            y_ibi_hat[i, :, length[i]:] = 0
             y_tn_hat[i, :, length[i]:] = 0
             y_td_hat[i, :, length[i]:] = 0
             y_key_hat[i, :, length[i]:] = 0
@@ -211,11 +216,11 @@ class ProposedModel(pl.LightningModule):
         # loss
         loss_b = F.binary_cross_entropy(y_b_hat, y_b)
         loss_db = F.binary_cross_entropy(y_db_hat, y_db)
-        loss_ibi = F.mse_loss(y_ibi_hat, y_ibi)
-        loss_tn = nn.NLLLoss()(y_tn_hat, y_tn)
-        loss_td = nn.NLLLoss()(y_td_hat, y_td)
+        loss_ibi = nn.NLLLoss(ignore_index=0)(y_ibi_hat, y_ibi)
+        loss_tn = nn.NLLLoss(ignore_index=0)(y_tn_hat, y_tn)
+        loss_td = nn.NLLLoss(ignore_index=0)(y_td_hat, y_td)
         loss_key = nn.NLLLoss()(y_key_hat, y_key)
-        loss = loss_b + loss_db + loss_ibi + loss_tn + loss_td + loss_key
+        loss = loss_b + loss_db + loss_ibi + 0.2 * loss_tn + 0.2 * loss_td + loss_key
         
         # metrics
         accs_b, precs_b, recs_b, fs_b = 0, 0, 0, 0
@@ -233,9 +238,10 @@ class ProposedModel(pl.LightningModule):
         precs_weighted_key, recs_weighted_key, fs_weighted_key = 0, 0, 0
 
         for i in range(x.shape[0]):
+            # get sample from batch
             y_b_hat_i = torch.round(y_b_hat[i, :length[i]])
             y_db_hat_i = torch.round(y_db_hat[i, :length[i]])
-            y_ibi_hat_i = y_ibi_hat[i, :length[i]]
+            y_ibi_hat_i = y_ibi_hat[i, :, :length[i]].topk(1, dim=0)[1][0]
             y_tn_hat_i = y_tn_hat[i, :, :length[i]].topk(1, dim=0)[1][0]
             y_td_hat_i = y_td_hat[i, :, :length[i]].topk(1, dim=0)[1][0]
             y_key_hat_i = y_key_hat[i, :, :length[i]].topk(1, dim=0)[1][0]
@@ -247,9 +253,18 @@ class ProposedModel(pl.LightningModule):
             y_td_i = y_td[i, :length[i]]
             y_key_i = y_key[i, :length[i]]
 
+            # filter out ignore indexes
+            y_ibi_hat_i = y_ibi_hat_i[y_ibi_i != 0]
+            y_ibi_i = y_ibi_i[y_ibi_i != 0]
+            y_tn_hat_i = y_tn_hat_i[y_tn_i != 0]
+            y_tn_i = y_tn_i[y_tn_i != 0]
+            y_td_hat_i = y_td_hat_i[y_td_i != 0]
+            y_td_i = y_td_i[y_td_i != 0]
+
+            # get accuracy
             acc_b, prec_b, rec_b, f_b = ModelUtils.f_measure_framewise(y_b_i, y_b_hat_i)
             acc_db, prec_db, rec_db, f_db = ModelUtils.f_measure_framewise(y_db_i, y_db_hat_i)
-            error_rate_ibi = torch.abs((y_ibi_hat_i / y_ibi_i).log()).mean()
+            error_rate_ibi = torch.abs(((y_ibi_hat_i+1e-10) / (y_ibi_i+1e-10)).log()).mean()
             (
                 prec_macro_tn, 
                 rec_macro_tn, 

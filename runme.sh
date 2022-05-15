@@ -22,11 +22,11 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
 # =============== Training/Testing ===============
 
-experiment_name="baseline"
-run_name='3_bins_activation'
+experiment_name="Default"
+run_name='run_2.debug'
 
 option="train"  # "train", "test" or "evaluate"
-model_type="baseline"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 resume_training=0  # 1 or 0 | default: 0
 plot_results=0  # 1 or 0 | default: 0 | for evaluation only
 
@@ -53,8 +53,8 @@ reverse_link=1  # 1 or 0 | default: 0
 output_type="regression"  # "regression" or "classification" | default: "regression"
 
 ## multiprocessing and data-parallel
-workers=4  # default: 8, debug: 0
-gpus=4  # default: 4, debug: 1
+workers=0  # default: 8, debug: 0
+gpus=1  # default: 4, debug: 1
 
 model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
 
