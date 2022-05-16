@@ -120,18 +120,29 @@ class DataUtils():
         key_signatures = [(k.time, k.key_number) for k in \
                             midi_data.key_signature_changes]
         # onsets_musical and note_values
-        def time2pos(time):
+        def time2pos(t):
             # convert time to position in musical time within a beat (unit: beat, range: 0-1)
             # after checking, we confirmed that beats[0] is always 0
-            idx = np.where(beats - time <= tolerance)[0][-1]
+            idx = np.where(beats - t <= tolerance)[0][-1]
             if idx+1 < len(beats):
                 base = midi_data.time_to_tick(beats[idx+1]) - midi_data.time_to_tick(beats[idx])
             else:
                 base = midi_data.time_to_tick(beats[-1]) - midi_data.time_to_tick(beats[-2])
-            return (midi_data.time_to_tick(time) - midi_data.time_to_tick(beats[idx])) / base
+            return (midi_data.time_to_tick(t) - midi_data.time_to_tick(beats[idx])) / base
 
-        onsets_musical = [time2pos(note.start) for note in note_sequence]
-        note_values = [time2pos(note.end) - time2pos(note.start) for note in note_sequence]
+        def times2note_value(start, end):
+            # convert start and end times to note value (unit: beat, range: 0-4)
+            idx = np.where(beats - start <= tolerance)[0][-1]
+            if idx+1 < len(beats):
+                base = midi_data.time_to_tick(beats[idx+1]) - midi_data.time_to_tick(beats[idx])
+            else:
+                base = midi_data.time_to_tick(beats[-1]) - midi_data.time_to_tick(beats[-2])
+            return (midi_data.time_to_tick(end) - midi_data.time_to_tick(start)) / base
+
+        # get onsets_musical and note_values
+        # filter out small negative values (they are usually caused by errors in time_to_tick convertion)
+        onsets_musical = [min(1, max(0, time2pos(note.start))) for note in note_sequence]  # in range 0-1
+        note_values = [max(0, times2note_value(note.start, note.end)) for note in note_sequence]
 
         # conver to Tensor
         note_sequence = torch.Tensor([[note.pitch, note.start, note.end-note.start, note.velocity] \

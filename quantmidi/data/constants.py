@@ -34,6 +34,10 @@ keySharps2Number = dict([(sharp, keyName2Number[keySharps2Name[sharp]]) for shar
 keyNumber2Sharps = dict([(number, keyName2Sharps[keyNumber2Name[number]]) for number in range(len(keyNumber2Name))])
 keyVocabSize = len(keySharps2Name) // 2  # ignore minor keys in key signature prediction!
 
+# =========== onset musical & note value definitions ===========
+N_per_beat = 24  # 24 resolution per beat
+max_note_value = 4 * N_per_beat  # 4 beats
+
 # ========= model training related constants =========
 batch_size_note_sequence = 32  # batch size for training on note sequence model
 batch_size_baseline = 8  # batch size for training on baseline model

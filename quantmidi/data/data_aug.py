@@ -36,9 +36,9 @@ class DataAugmentation():
         # extra note or missing note
         extra_or_missing = random.random()
         if extra_or_missing < self.extra_note_prob:
-            note_sequence = self.extra_note(note_sequence)
+            note_sequence, annotations = self.extra_note(note_sequence, annotations)
         elif extra_or_missing > 1. - self.missing_note_prob:
-            note_sequence = self.missing_note(note_sequence)
+            note_sequence, annotations = self.missing_note(note_sequence, annotations)
 
         return note_sequence, annotations
 
@@ -61,18 +61,28 @@ class DataAugmentation():
             
         return note_sequence, annotations
 
-    def extra_note(self, note_sequence):
+    def extra_note(self, note_sequence, annotations):
         # duplicate
         note_sequence_new = torch.zeros(len(note_sequence) * 2, 4)
-        note_sequence_new[::2,:] = note_sequence.clone()
-        note_sequence_new[1::2,:] = note_sequence.clone()
+        note_sequence_new[::2,:] = note_sequence.clone()  # original notes
+        note_sequence_new[1::2,:] = note_sequence.clone()  # extra notes
 
-        # keep a random ratio of extra notes
-        ratio = random.random() * 0.3
-        probs = torch.rand(len(note_sequence_new))
-        probs[::2] = 0.
-        remaining = probs < ratio
-        note_sequence_new = note_sequence_new[remaining]
+        if annotations['onsets_musical'] is not None:
+            onsets_musical_new = torch.zeros(len(note_sequence) * 2)
+            onsets_musical_new[::2] = annotations['onsets_musical'].clone()
+            onsets_musical_new[1::2] = annotations['onsets_musical'].clone()
+
+        if annotations['note_value'] is not None:
+            note_value_new = torch.zeros(len(note_sequence) * 2)
+            note_value_new[::2] = annotations['note_value'].clone()
+            note_value_new[1::2] = annotations['note_value'].clone()
+
+        if annotations['hands'] is not None:
+            hands_new = torch.zeros(len(note_sequence) * 2)
+            hands_new[::2] = annotations['hands'].clone()
+            hands_new[1::2] = annotations['hands'].clone()
+            hands_mask = torch.ones(len(note_sequence) * 2)  # mask out hand for extra notes during training
+            hands_mask[1::2] = 0
 
         # pitch shift for extra notes (+-12)
         shift = ((torch.round(torch.rand(len(note_sequence_new))) - 0.5) * 24).int()
@@ -81,9 +91,23 @@ class DataAugmentation():
         note_sequence_new[:,0][note_sequence_new[:,0] < 0] += 12
         note_sequence_new[:,0][note_sequence_new[:,0] > 127] -= 12
 
-        return note_sequence_new
+        # keep a random ratio of extra notes
+        ratio = random.random() * 0.3
+        probs = torch.rand(len(note_sequence_new))
+        probs[::2] = 0.
+        remaining = probs < ratio
+        note_sequence_new = note_sequence_new[remaining]
+        if annotations['onsets_musical'] is not None:
+            annotations['onsets_musical'] = onsets_musical_new[remaining]
+        if annotations['note_value'] is not None:
+            annotations['note_value'] = note_value_new[remaining]
+        if annotations['hands'] is not None:
+            annotations['hands'] = hands_new[remaining]
+            annotations['hands_mask'] = hands_mask[remaining]
 
-    def missing_note(self, note_sequence):
+        return note_sequence_new, annotations
+
+    def missing_note(self, note_sequence, annotations):
         # find successing concurrent notes
         candidates = torch.diff(note_sequence[:,1]) < tolerance
 
@@ -94,5 +118,11 @@ class DataAugmentation():
 
         # remove selected candidates
         note_sequence = note_sequence[remaining]
+        if annotations['onsets_musical'] is not None:
+            annotations['onsets_musical'] = annotations['onsets_musical'][remaining]
+        if annotations['note_value'] is not None:
+            annotations['note_value'] = annotations['note_value'][remaining]
+        if annotations['hands'] is not None:
+            annotations['hands'] = annotations['hands'][remaining]
 
-        return note_sequence
+        return note_sequence, annotations

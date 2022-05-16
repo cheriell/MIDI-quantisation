@@ -18,6 +18,8 @@ from quantmidi.data.constants import (
     tsNume2Index,
     tsDeno2Index,
     keyVocabSize,
+    N_per_beat,
+    max_note_value,
 )
 
 
@@ -214,7 +216,14 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             else:
                 start_idx, end_idx = 0, len(note_sequence)
             note_sequence = note_sequence[start_idx:end_idx]
-
+            if annotations['onsets_musical'] is not None:
+                annotations['onsets_musical'] = annotations['onsets_musical'][start_idx:end_idx]
+            if annotations['note_value'] is not None:
+                annotations['note_value'] = annotations['note_value'][start_idx:end_idx]
+            if annotations['hands'] is not None:
+                annotations['hands'] = annotations['hands'][start_idx:end_idx]
+            if 'hands_mask' in annotations.keys():
+                annotations['hands_mask'] = annotations['hands_mask'][start_idx:end_idx]
 
             # =========== get model output ===========
             # list of beat probs in torch tensor
@@ -278,6 +287,35 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                         break
                     key_numbers[i] = ks[1] % keyVocabSize
 
+            # onsets_musical
+            if annotations['onsets_musical'] is not None:
+                onsets_mask = torch.ones(len(note_sequence))
+                onsets = torch.round(annotations['onsets_musical'] * N_per_beat)
+                onsets[onsets == N_per_beat] = 0  # reset one beat onset to 0 (counting from the next beat)
+            else:
+                onsets_mask = torch.zeros(len(note_sequence))
+                onsets = torch.zeros(len(note_sequence))
+
+            # note_value
+            if annotations['note_value'] is not None:
+                note_value_mask = torch.ones(len(note_sequence))
+                note_value = torch.round(annotations['note_value'] * N_per_beat)
+                note_value[note_value > max_note_value] = 0  # clip note_value to [0, max_note_value], index 0 will be ignored during training
+            else:
+                note_value_mask = torch.zeros(len(note_sequence))
+                note_value = torch.zeros(len(note_sequence))
+
+            # hands
+            if annotations['hands'] is not None:
+                if 'hands_mask' in annotations.keys():
+                    hands_mask = annotations['hands_mask']
+                else:
+                    hands_mask = torch.ones(len(note_sequence))
+                hands = annotations['hands']
+            else:
+                hands_mask = torch.zeros(len(note_sequence))
+                hands = torch.zeros(len(note_sequence))
+
             # ============ pad if length is shorter than max_length ============
             length = len(note_sequence)
             if len(note_sequence) < max_length_note_sequence:
@@ -288,8 +326,29 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
                 ts_numes = torch.cat([ts_numes, torch.zeros(max_length_note_sequence - len(ts_numes))])
                 ts_denos = torch.cat([ts_denos, torch.zeros(max_length_note_sequence - len(ts_denos))])
                 key_numbers = torch.cat([key_numbers, torch.zeros(max_length_note_sequence - len(key_numbers))])
+                onsets = torch.cat([onsets, torch.zeros(max_length_note_sequence - len(onsets))])
+                onsets_mask = torch.cat([onsets_mask, torch.zeros(max_length_note_sequence - len(onsets_mask))])
+                note_value = torch.cat([note_value, torch.zeros(max_length_note_sequence - len(note_value))])
+                note_value_mask = torch.cat([note_value_mask, torch.zeros(max_length_note_sequence - len(note_value_mask))])
+                hands = torch.cat([hands, torch.zeros(max_length_note_sequence - len(hands))])
+                hands_mask = torch.cat([hands_mask, torch.zeros(max_length_note_sequence - len(hands_mask))])
             
-            return note_sequence, beat_probs, downbeat_probs, ibis, ts_numes, ts_denos, key_numbers, length
+            return (
+                note_sequence, 
+                beat_probs, 
+                downbeat_probs, 
+                ibis, 
+                ts_numes, 
+                ts_denos, 
+                key_numbers, 
+                onsets, 
+                onsets_mask, 
+                note_value,
+                note_value_mask,
+                hands,
+                hands_mask,
+                length,
+            )
 
         if self.model_type == 'note_sequence':
             return get_data_note_sequence(note_sequence, annotations)
