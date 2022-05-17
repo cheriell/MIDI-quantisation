@@ -124,6 +124,6 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True, 
                     beats_filled.append(beats[i] + x * ibi / ratio)
     beats = np.array(beats_filled)
 
-    return beats, downbeats
+    return np.sort(beats), np.sort(downbeats)
 
 

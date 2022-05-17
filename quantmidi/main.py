@@ -9,6 +9,7 @@ import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import mir_eval
 from pathlib import Path
 
 from quantmidi.data.data_module import QuantMIDIDataModule
@@ -110,8 +111,6 @@ def train_or_test(args):
 
 def evaluate(args):
 
-    from madmom.evaluation.beats import BeatEvaluation, BeatMeanEvaluation
-
     feature_folder = str(Path(args.workspace, 'features'))
     device = torch.device('cuda') if args.gpus else torch.device('cpu')
 
@@ -189,14 +188,16 @@ def evaluate(args):
                 input('enter to continue')
 
         # evaluate using beat-level F-measure
-        evals_beats.append(BeatEvaluation(beats_pred, beats_targ))
-        evals_downbeats.append(BeatEvaluation(downbeats_pred, downbeats_targ, downbeats=True))
+        f_beats = mir_eval.beat.f_measure(mir_eval.beat.trim_beats(beats_targ), mir_eval.beat.trim_beats(beats_pred))
+        f_downbeats = mir_eval.beat.f_measure(mir_eval.beat.trim_beats(downbeats_targ), mir_eval.beat.trim_beats(downbeats_pred))
+        evals_beats.append(f_beats)
+        evals_downbeats.append(f_downbeats)
     
     print('\n ======== Beat-level F-measure =========')
     print('Beat tracking:')
-    print(BeatMeanEvaluation(evals_beats))
+    print('F-measure: {:.4f}'.format(np.mean(evals_beats)))
     print('Downbeat tracking:')
-    print(BeatMeanEvaluation(evals_downbeats))
+    print('F-measure: {:.4f}'.format(np.mean(evals_downbeats)))
 
 if __name__ == '__main__':
     

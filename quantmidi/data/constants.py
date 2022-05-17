@@ -39,7 +39,7 @@ keyVocabSize = len(keySharps2Name) // 2  # ignore minor keys in key signature pr
 N_per_beat = 24  # 24 resolution per beat
 max_note_value = 4 * N_per_beat  # 4 beats
 
-# proposed model version 2 (precision: 32th note and sextuplet)
+# proposed model version 2 (precision: 64th note and sextuplet)
 # onsets musical
 onsetPositions = [0, 1/16, 2/16, 1/6, 3/16, 4/16, 5/16, 2/6, 6/16, 7/16, 8/16, 9/16, 10/16, 4/6, 11/16, 12/16, 13/16, 5/6, 14/16, 15/16]
 def onsetPosition2Index(onset_position):
