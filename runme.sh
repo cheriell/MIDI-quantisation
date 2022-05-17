@@ -23,7 +23,7 @@ ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 # =============== Training/Testing ===============
 
 experiment_name="Default"
-run_name='all_outputs_v1'
+run_name='all_outputs_v2'
 
 option="train"  # "train", "test" or "evaluate"
 model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
@@ -49,14 +49,14 @@ downbeats=1  # 1 or 0 | default: 0
 tempos=1  # 1 or 0 | default: 0
 reverse_link=1  # 1 or 0 | default: 0
 
-## output data
-output_type="regression"  # "regression" or "classification" | default: "regression"
+## proposed model version
+proposed_model_version=2  # 1 or 2 | default: 1
 
 ## multiprocessing and data-parallel
 workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/6/323e4d984984447c90470abb30b061e7/checkpoints/last.ckpt"
 
 echo ">>> "$option" the model"
 
@@ -82,7 +82,7 @@ python3 quantmidi/main.py \
     --downbeats $downbeats \
     --tempos $tempos \
     --reverse_link $reverse_link \
-    --output_type $output_type \
+    --proposed_model_version $proposed_model_version \
     --workers $workers \
     --gpus $gpus \
     --model_checkpoint $model_checkpoint \

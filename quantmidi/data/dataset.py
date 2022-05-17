@@ -20,6 +20,8 @@ from quantmidi.data.constants import (
     keyVocabSize,
     N_per_beat,
     max_note_value,
+    onsetPosition2Index,
+    noteValue2Index,
 )
 
 
@@ -29,6 +31,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         feature_folder, 
         split, 
         model_type,
+        proposed_model_version,
         **kwargs
     ):
         super().__init__()
@@ -36,6 +39,7 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
         self.feature_folder = feature_folder
         self.split = split
         self.model_type = model_type
+        self.proposed_model_version = proposed_model_version
 
         if self.model_type == 'note_sequence':
             self.batch_size = batch_size_note_sequence
@@ -290,8 +294,13 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             # onsets_musical
             if annotations['onsets_musical'] is not None:
                 onsets_mask = torch.ones(len(note_sequence))
-                onsets = torch.round(annotations['onsets_musical'] * N_per_beat)
-                onsets[onsets == N_per_beat] = 0  # reset one beat onset to 0 (counting from the next beat)
+                if self.proposed_model_version == 1:
+                    onsets = torch.round(annotations['onsets_musical'] * N_per_beat)
+                    onsets[onsets == N_per_beat] = 0  # reset one beat onset to 0 (counting from the next beat)
+                elif self.proposed_model_version == 2:
+                    onsets = torch.zeros(len(note_sequence))
+                    for ni in range(len(note_sequence)):
+                        onsets[ni] = onsetPosition2Index(annotations['onsets_musical'][ni].item())
             else:
                 onsets_mask = torch.zeros(len(note_sequence))
                 onsets = torch.zeros(len(note_sequence))
@@ -299,8 +308,13 @@ class QuantMIDIDataset(torch.utils.data.Dataset):
             # note_value
             if annotations['note_value'] is not None:
                 note_value_mask = torch.ones(len(note_sequence))
-                note_value = torch.round(annotations['note_value'] * N_per_beat)
-                note_value[note_value > max_note_value] = 0  # clip note_value to [0, max_note_value], index 0 will be ignored during training
+                if self.proposed_model_version == 1:
+                    note_value = torch.round(annotations['note_value'] * N_per_beat)
+                    note_value[note_value > max_note_value] = 0  # clip note_value to [0, max_note_value], index 0 will be ignored during training
+                elif self.proposed_model_version == 2:
+                    note_value = torch.zeros(len(note_sequence))
+                    for ni in range(len(note_sequence)):
+                        note_value[ni] = noteValue2Index(annotations['note_value'][ni].item())
             else:
                 note_value_mask = torch.zeros(len(note_sequence))
                 note_value = torch.zeros(len(note_sequence))

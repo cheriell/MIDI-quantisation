@@ -41,8 +41,13 @@ def train_or_test(args):
         'extra_note_prob': args.extra_note_prob,
         'missing_note_prob': args.missing_note_prob,
     }
-    datamodule = QuantMIDIDataModule(feature_folder=feature_folder, model_type=args.model_type, 
-                                    data_aug_args=data_aug_args, workers=args.workers)
+    datamodule = QuantMIDIDataModule(
+        feature_folder=feature_folder, 
+        model_type=args.model_type, 
+        data_aug_args=data_aug_args, 
+        workers=args.workers,
+        proposed_model_version=args.proposed_model_version,
+    )
 
     if args.model_type == 'note_sequence':
         model = NoteSequenceModel(
@@ -57,7 +62,7 @@ def train_or_test(args):
     elif args.model_type == 'baseline':
         model = BaselineModel()
     elif args.model_type == 'proposed':
-        model = ProposedModel()
+        model = ProposedModel(version=args.proposed_model_version)
 
     logger = pl.loggers.MLFlowLogger(
         experiment_name=args.experiment_name,
@@ -79,7 +84,7 @@ def train_or_test(args):
             'downbeats': args.downbeats,
             'tempos': args.tempos,
             'reverse_link': args.reverse_link,
-            'output_type': args.output_type,
+            'proposed_model_version': args.proposed_model_version,
             'workers': args.workers,
             'gpus': args.gpus,
         },
@@ -125,7 +130,7 @@ def evaluate(args):
     elif args.model_type == 'baseline':
         model = BaselineModel.load_from_checkpoint(args.model_checkpoint).to(device)
     elif args.model_type == 'proposed':
-        model = ProposedModel.load_from_checkpoint(args.model_checkpoint).to(device)
+        model = ProposedModel.load_from_checkpoint(args.model_checkpoint, version=args.proposed_model_version).to(device)
     model.eval()
 
     # ========= get test set metadata =========
@@ -242,9 +247,8 @@ if __name__ == '__main__':
     parser.add_argument('--reverse_link', type=int, help='Whether to reverse link between beats and \
                         downbeats or not', default=0)
 
-    # output data comparison
-    parser.add_argument('--output_type', type=str, help='Type of output for musical onsets and note values, \
-                        select from [regression, classification]', default='regression')
+    # proposed model version
+    parser.add_argument('--proposed_model_version', type=int, help='Version of the proposed model', default=1)
 
     # parallelization
     parser.add_argument('--workers', type=int, help='Number of workers for parallel processing', default=8)

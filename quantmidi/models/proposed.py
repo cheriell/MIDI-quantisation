@@ -11,6 +11,8 @@ from quantmidi.data.constants import (
     keyVocabSize,
     N_per_beat,
     max_note_value,
+    onsetVocabSize,
+    noteValueVocabSize,
 )
 
 learning_rate = 1e-3
@@ -25,6 +27,7 @@ class ProposedModel(pl.LightningModule):
         pitch_encoding='midi',
         onset_encoding='shift-onehot',
         duration_encoding='raw',
+        version=1,
     ):
         super().__init__()
 
@@ -32,40 +35,88 @@ class ProposedModel(pl.LightningModule):
         self.pitch_encoding = pitch_encoding
         self.onset_encoding = onset_encoding
         self.duration_encoding = duration_encoding
+        self.version = version
 
         in_features = ModelUtils.get_encoding_in_features(input_features, pitch_encoding, onset_encoding, duration_encoding)
 
-        # beats, downbeats and tempo
-        self.convs_b_db_tempo = ConvBlock(in_features=in_features)
-        self.gru_beat = GRUBlock(in_features=hidden_size)
-        self.gru_downbeat = GRUBlock(in_features=hidden_size)
-        self.gru_tempo = GRUBlock(in_features=hidden_size)
-        self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
-        self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
-        self.out_tempo = LinearOutput(in_features=hidden_size, out_features=ibiVocab, activation_type='softmax')
+        # ======================================================================================
+        # Version 1:
+        # ======================================================================================
+        if self.version == 1:
+            # beats, downbeats and tempo
+            self.convs_b_db_tempo = ConvBlock(in_features=in_features)
+            self.gru_beat = GRUBlock(in_features=hidden_size)
+            self.gru_downbeat = GRUBlock(in_features=hidden_size)
+            self.gru_tempo = GRUBlock(in_features=hidden_size)
+            self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+            self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+            self.out_tempo = LinearOutput(in_features=hidden_size, out_features=ibiVocab, activation_type='softmax')
 
-        # time signatures
-        self.conv_time = ConvBlock(in_features=in_features)
-        self.gru_time = GRUBlock(in_features=hidden_size)
-        self.out_time_nume = LinearOutput(in_features=hidden_size, out_features=tsNumeVocabSize, activation_type='softmax')
-        self.out_time_deno = LinearOutput(in_features=hidden_size, out_features=tsDenoVocabSize, activation_type='softmax')
+            # time signatures
+            self.conv_time = ConvBlock(in_features=in_features)
+            self.gru_time = GRUBlock(in_features=hidden_size)
+            self.out_time_nume = LinearOutput(in_features=hidden_size, out_features=tsNumeVocabSize, activation_type='softmax')
+            self.out_time_deno = LinearOutput(in_features=hidden_size, out_features=tsDenoVocabSize, activation_type='softmax')
 
-        # key signatures
-        self.conv_key = ConvBlock(in_features=in_features)
-        self.gru_key = GRUBlock(in_features=hidden_size)
-        self.out_key = LinearOutput(in_features=hidden_size, out_features=keyVocabSize, activation_type='softmax')
+            # key signatures
+            self.conv_key = ConvBlock(in_features=in_features)
+            self.gru_key = GRUBlock(in_features=hidden_size)
+            self.out_key = LinearOutput(in_features=hidden_size, out_features=keyVocabSize, activation_type='softmax')
 
-        # onsets musical and note value
-        self.conv_o_v = ConvBlock(in_features=in_features)
-        self.gru_onset = GRUBlock(in_features=hidden_size)
-        self.gru_value = GRUBlock(in_features=hidden_size)
-        self.out_onset = LinearOutput(in_features=hidden_size, out_features=N_per_beat, activation_type='softmax')
-        self.out_value = LinearOutput(in_features=hidden_size, out_features=max_note_value+1, activation_type='softmax')
+            # onsets musical and note value
+            self.conv_o_v = ConvBlock(in_features=in_features)
+            self.gru_onset = GRUBlock(in_features=hidden_size)
+            self.gru_value = GRUBlock(in_features=hidden_size)
+            self.out_onset = LinearOutput(in_features=hidden_size, out_features=N_per_beat, activation_type='softmax')
+            self.out_value = LinearOutput(in_features=hidden_size, out_features=max_note_value+1, activation_type='softmax')
 
-        # hands
-        self.conv_hands = ConvBlock(in_features=in_features)
-        self.gru_hands = GRUBlock(in_features=hidden_size)
-        self.out_hands = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+            # hands
+            self.conv_hands = ConvBlock(in_features=in_features)
+            self.gru_hands = GRUBlock(in_features=hidden_size)
+            self.out_hands = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+
+        # ======================================================================================
+        # Version 2:
+        # ======================================================================================
+        elif self.version == 2:
+            # beats, downbeats and tempo
+            self.conv_beat = ConvBlock(in_features=in_features)
+            self.conv_downbeat = ConvBlock(in_features=in_features)
+            self.conv_tempo = ConvBlock(in_features=in_features)
+
+            self.gru_beat = GRUBlock(in_features=hidden_size+1+ibiVocab)
+            self.gru_downbeat = GRUBlock(in_features=hidden_size+ibiVocab)
+            self.gru_tempo = GRUBlock(in_features=hidden_size)
+
+            self.out_beat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+            self.out_downbeat = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+            self.out_tempo = LinearOutput(in_features=hidden_size, out_features=ibiVocab, activation_type='softmax')
+
+            # time signatures
+            self.conv_time = ConvBlock(in_features=in_features)
+            self.gru_time = GRUBlock(in_features=hidden_size)
+            self.out_time_nume = LinearOutput(in_features=hidden_size, out_features=tsNumeVocabSize, activation_type='softmax')
+            self.out_time_deno = LinearOutput(in_features=hidden_size, out_features=tsDenoVocabSize, activation_type='softmax')
+
+            # key signatures
+            self.conv_key = ConvBlock(in_features=in_features)
+            self.gru_key = GRUBlock(in_features=hidden_size)
+            self.out_key = LinearOutput(in_features=hidden_size, out_features=keyVocabSize, activation_type='softmax')
+
+            # hands
+            self.conv_hands = ConvBlock(in_features=in_features)
+            self.gru_hands = GRUBlock(in_features=hidden_size)
+            self.out_hands = LinearOutput(in_features=hidden_size, out_features=1, activation_type='sigmoid')
+
+            # onsets musical and note value
+            self.conv_o = ConvBlock(in_features=in_features)
+            self.conv_v = ConvBlock(in_features=in_features)
+
+            self.gru_o = GRUBlock(in_features=hidden_size+noteValueVocabSize)
+            self.gru_v = GRUBlock(in_features=hidden_size)
+
+            self.out_o = LinearOutput(in_features=hidden_size, out_features=onsetVocabSize, activation_type='softmax')
+            self.out_v = LinearOutput(in_features=hidden_size, out_features=noteValueVocabSize, activation_type='softmax')
 
     def forward(self, x):
         # x: (batch_size, sequence_length, len(features))
@@ -74,37 +125,86 @@ class ProposedModel(pl.LightningModule):
         x_encoded = ModelUtils.encode_input_feature(x, self.input_features, self.pitch_encoding, self.onset_encoding, self.duration_encoding)
         # (batch_size, sequence_length, in_features)
 
-        # beats, downbeats and tempo
-        x_b_db_tempo = self.convs_b_db_tempo(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x_gru_beat = self.gru_beat(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
-        x_gru_downbeat = self.gru_downbeat(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
-        x_gru_tempo = self.gru_tempo(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
-        y_b = self.out_beat(x_gru_beat) # (batch_size, sequence_length, 1)
-        y_db = self.out_downbeat(x_gru_downbeat)  # (batch_size, sequence_length, 1)
-        y_tempo = self.out_tempo(x_gru_tempo)  # (batch_size, sequence_length, ibiVocab)
+        # ======================================================================================
+        # Version 1:
+        # ======================================================================================
+        if self.version == 1:
+            # beats, downbeats and tempo
+            x_b_db_tempo = self.convs_b_db_tempo(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_beat = self.gru_beat(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
+            x_gru_downbeat = self.gru_downbeat(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
+            x_gru_tempo = self.gru_tempo(x_b_db_tempo)  # (batch_size, sequence_length, hidden_size)
+            y_b = self.out_beat(x_gru_beat) # (batch_size, sequence_length, 1)
+            y_db = self.out_downbeat(x_gru_downbeat)  # (batch_size, sequence_length, 1)
+            y_tempo = self.out_tempo(x_gru_tempo)  # (batch_size, sequence_length, ibiVocab)
 
-        # time signatures
-        x_conv_time = self.conv_time(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x_gru_time = self.gru_time(x_conv_time)  # (batch_size, sequence_length, hidden_size)
-        y_time_nume = self.out_time_nume(x_gru_time)  # (batch_size, sequence_length, tsNumeVocabSize)
-        y_time_deno = self.out_time_deno(x_gru_time)  # (batch_size, sequence_length, tsDenoVocabSize)
+            # time signatures
+            x_conv_time = self.conv_time(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_time = self.gru_time(x_conv_time)  # (batch_size, sequence_length, hidden_size)
+            y_time_nume = self.out_time_nume(x_gru_time)  # (batch_size, sequence_length, tsNumeVocabSize)
+            y_time_deno = self.out_time_deno(x_gru_time)  # (batch_size, sequence_length, tsDenoVocabSize)
 
-        # key signatures
-        x_conv_key = self.conv_key(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x_gru_key = self.gru_key(x_conv_key)  # (batch_size, sequence_length, hidden_size)
-        y_key = self.out_key(x_gru_key)  # (batch_size, sequence_length, keyVocabSize)
+            # key signatures
+            x_conv_key = self.conv_key(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_key = self.gru_key(x_conv_key)  # (batch_size, sequence_length, hidden_size)
+            y_key = self.out_key(x_gru_key)  # (batch_size, sequence_length, keyVocabSize)
 
-        # onsets musical and note value
-        x_conv_o_v = self.conv_o_v(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x_gru_onset = self.gru_onset(x_conv_o_v)  # (batch_size, sequence_length, hidden_size)
-        x_gru_value = self.gru_value(x_conv_o_v)  # (batch_size, sequence_length, hidden_size)
-        y_onset = self.out_onset(x_gru_onset)  # (batch_size, sequence_length, N_per_beat)
-        y_value = self.out_value(x_gru_value)  # (batch_size, sequence_length, max_note_value+1)
+            # onsets musical and note value
+            x_conv_o_v = self.conv_o_v(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_onset = self.gru_onset(x_conv_o_v)  # (batch_size, sequence_length, hidden_size)
+            x_gru_value = self.gru_value(x_conv_o_v)  # (batch_size, sequence_length, hidden_size)
+            y_onset = self.out_onset(x_gru_onset)  # (batch_size, sequence_length, N_per_beat)
+            y_value = self.out_value(x_gru_value)  # (batch_size, sequence_length, max_note_value+1)
 
-        # hands
-        x_conv_hands = self.conv_hands(x_encoded)  # (batch_size, sequence_length, hidden_size)
-        x_gru_hands = self.gru_hands(x_conv_hands)  # (batch_size, sequence_length, hidden_size)
-        y_hands = self.out_hands(x_gru_hands)  # (batch_size, sequence_length, 1)
+            # hands
+            x_conv_hands = self.conv_hands(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_hands = self.gru_hands(x_conv_hands)  # (batch_size, sequence_length, hidden_size)
+            y_hands = self.out_hands(x_gru_hands)  # (batch_size, sequence_length, 1)
+
+        # ======================================================================================
+        # Version 2:
+        # ======================================================================================
+        elif self.version == 2:
+            # beats, downbeats and tempo
+            x_conv_tempo = self.conv_tempo(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_tempo = self.gru_tempo(x_conv_tempo)  # (batch_size, sequence_length, hidden_size)
+            y_tempo = self.out_tempo(x_gru_tempo)  # (batch_size, sequence_length, ibiVocab)
+            
+            x_conv_db = self.conv_downbeat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_db_input = torch.cat((x_conv_db, y_tempo), dim=2)
+            x_gru_db = self.gru_downbeat(x_gru_db_input)  # (batch_size, sequence_length, hidden_size)
+            y_db = self.out_downbeat(x_gru_db)  # (batch_size, sequence_length, 1)
+
+            x_conv_b = self.conv_beat(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_b_input = torch.cat((x_conv_b, y_db, y_tempo), dim=2)
+            x_gru_b = self.gru_beat(x_gru_b_input)  # (batch_size, sequence_length, hidden_size)
+            y_b = self.out_beat(x_gru_b)  # (batch_size, sequence_length, 1)
+
+            # time signatures
+            x_conv_time = self.conv_time(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_time = self.gru_time(x_conv_time)  # (batch_size, sequence_length, hidden_size)
+            y_time_nume = self.out_time_nume(x_gru_time)  # (batch_size, sequence_length, tsNumeVocabSize)
+            y_time_deno = self.out_time_deno(x_gru_time)  # (batch_size, sequence_length, tsDenoVocabSize)
+
+            # key signatures
+            x_conv_key = self.conv_key(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_key = self.gru_key(x_conv_key)  # (batch_size, sequence_length, hidden_size)
+            y_key = self.out_key(x_gru_key)  # (batch_size, sequence_length, keyVocabSize)
+
+            # hands
+            x_conv_hands = self.conv_hands(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_hands = self.gru_hands(x_conv_hands)  # (batch_size, sequence_length, hidden_size)
+            y_hands = self.out_hands(x_gru_hands)  # (batch_size, sequence_length, 1)
+
+            # onsets musical and note value
+            x_conv_v = self.conv_v(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_v = self.gru_v(x_conv_v)  # (batch_size, sequence_length, hidden_size)
+            y_value = self.out_v(x_gru_v)  # (batch_size, sequence_length, noteValueVocabSize)
+
+            x_conv_o = self.conv_o(x_encoded)  # (batch_size, sequence_length, hidden_size)
+            x_gru_o_input = torch.cat((x_conv_o, y_value), dim=2)
+            x_gru_o = self.gru_o(x_gru_o_input)  # (batch_size, sequence_length, hidden_size)
+            y_onset = self.out_o(x_gru_o)  # (batch_size, sequence_length, onsetVocabSize)
 
         # squeeze and transpose
         y_b = y_b.squeeze(dim=-1)  # (batch_size, sequence_length)

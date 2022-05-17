@@ -1,4 +1,4 @@
-
+import numpy as np
 
 # ========== data representation related constants ==========
 ## quantisation resolution
@@ -35,8 +35,45 @@ keyNumber2Sharps = dict([(number, keyName2Sharps[keyNumber2Name[number]]) for nu
 keyVocabSize = len(keySharps2Name) // 2  # ignore minor keys in key signature prediction!
 
 # =========== onset musical & note value definitions ===========
+# proposed model version 1:
 N_per_beat = 24  # 24 resolution per beat
 max_note_value = 4 * N_per_beat  # 4 beats
+
+# proposed model version 2 (precision: 32th note and sextuplet)
+# onsets musical
+onsetPositions = [0, 1/16, 2/16, 1/6, 3/16, 4/16, 5/16, 2/6, 6/16, 7/16, 8/16, 9/16, 10/16, 4/6, 11/16, 12/16, 13/16, 5/6, 14/16, 15/16]
+def onsetPosition2Index(onset_position):
+    """Convert onset position in beats into index in onsetPositions"""
+    onset_positions_all = np.array(onsetPositions + [1])
+    idx = np.argmin(np.abs(onset_positions_all - onset_position))
+    if idx == len(onsetPositions):
+        idx = 0
+    return idx
+Index2onsetPosition = onsetPositions
+onsetVocabSize = len(onsetPositions)
+# note values
+noteValues = [
+    0,  # 0 reserved for unknown, ignore during training
+    4, 2, 1, 1/2, 1/4, 1/8, 1/16,  # whole, half, 4th, 8th, 16th, 32th, 64th notes
+    2/3, 1/3, 1/6, 5/6, # triplets, sextuplets
+]
+# update with tied notes (including dotted notes)
+note_values_tied = []
+for i in range(1, len(noteValues)):
+    for j in range(i+1, len(noteValues)):
+        note_value_tied = noteValues[i] + noteValues[j]
+        if np.min(np.abs(np.array(noteValues) - note_value_tied)) > 1/32:
+            note_values_tied.append(note_value_tied)
+noteValues = noteValues + note_values_tied
+def noteValue2Index(note_value):
+    """Convert note value in beats into index in noteValues"""
+    if note_value > 4.5:
+        return 0  # set too long note_values to 0
+    note_values_all = np.array(noteValues)
+    idx = np.argmin(np.abs(note_values_all - note_value))
+    return idx
+Index2noteValue = noteValues
+noteValueVocabSize = len(noteValues)
 
 # ========= model training related constants =========
 batch_size_note_sequence = 32  # batch size for training on note sequence model
