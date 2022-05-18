@@ -4,12 +4,14 @@ import pandas as pd
 import pickle
 import torch
 from pathlib import Path
+from enum import IntEnum, auto
 import matplotlib.pyplot as plt
 
 from quantmidi.data.constants import *
 
 # feature_folder = '/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/features'
 # metadata = pd.read_csv(str(Path(feature_folder, 'metadata.csv')))
+# metadata = metadata[metadata['split'] == 'test']
 
 # ibis = torch.Tensor([])
 
@@ -24,7 +26,27 @@ from quantmidi.data.constants import *
 # plt.hist(ibis, bins=100)
 # plt.savefig('debug.png')
 
-# print(ibis.mean(), ibis.min(), ibis.max())
-print(len(noteValues))
-print(noteValues)
-print(noteValue2Index(2/16))
+
+class Action(IntEnum):
+    NO_ACTION = auto()
+    INSERT_ONE = auto()
+    INSERT_TWO = auto()
+    INSERT_THREE = auto()
+    DELETE_ONE = auto()
+    DELETE_TWO = auto()
+    DELETE_THREE = auto()
+    INSERT_ONE_DELETE_ONE = auto()
+    INSERT_ONE_DELETE_TWO = auto()
+    INSERT_ONE_DELETE_THREE = auto()
+    INSERT_TWO_DELETE_ONE = auto()
+    INSERT_TWO_DELETE_TWO = auto()
+    INSERT_TWO_DELETE_THREE = auto()
+    INSERT_THREE_DELETE_ONE = auto()
+    INSERT_THREE_DELETE_TWO = auto()
+    INSERT_THREE_DELETE_THREE = auto()
+
+d = {Action.NO_ACTION:0, 1:1}
+print(len(Action))
+for a in Action:
+    if a == 0:
+        print(d[a])

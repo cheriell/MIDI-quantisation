@@ -17,6 +17,7 @@ from quantmidi.models.note_sequence import NoteSequenceModel
 from quantmidi.models.baseline import BaselineModel
 from quantmidi.models.proposed import ProposedModel
 from quantmidi.post_processing import DBN_beat_track, post_process
+from quantmidi.data.constants import resolution
 
 ## -------------------------
 ## DEBUGGING BLOCK
@@ -158,7 +159,13 @@ def evaluate(args):
             beats_pred, downbeats_pred = DBN_beat_track(y_b, y_db)
 
         elif args.model_type == 'proposed':
-            continue
+            y_b, y_db, y_tempo, y_time_nume, y_time_deno, y_key, y_onset, y_value, y_hands = model(note_sequence)
+            y_b = y_b.squeeze(0).cpu().detach().numpy()
+            y_db = y_db.squeeze(0).cpu().detach().numpy()
+            y_tempo = y_tempo.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy() * resolution
+
+            onsets = note_sequence[0,:,1].cpu().detach().numpy()
+            beats_pred, downbeats_pred = post_process(onsets, y_b, y_db)
 
         elif args.model_type == 'note_sequence':
             y_b, y_db = model(note_sequence)

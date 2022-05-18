@@ -247,7 +247,7 @@ class ProposedModel(pl.LightningModule):
             patience=200,
             mode='max',
         )
-        return [checkpoint_callback, earlystop_callback]
+        return [checkpoint_callback]#, earlystop_callback]
 
     def training_step(self, batch, batch_idx):
         # data

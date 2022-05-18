@@ -3,3 +3,4 @@ nohup.out*
 .nfs*
 *figures*
 debug*
+checkpoints/

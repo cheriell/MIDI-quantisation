@@ -1,12 +1,16 @@
 import madmom
 import numpy as np
+from enum import IntEnum, auto
+from collections import defaultdict
 
 from quantmidi.data.constants import resolution, tolerance
 
-min_bpm = 50
+min_bpm = 40
 max_bpm = 220
-transition_lambda = 100.0
 
+# ==================== DBN beat tracker ====================
+
+transition_lambda = 100.0
 beat_tracker = madmom.features.beats.DBNBeatTrackingProcessor(
     min_bpm=min_bpm,
     max_bpm=max_bpm,
@@ -20,7 +24,6 @@ downbeat_tracker = madmom.features.downbeats.DBNDownBeatTrackingProcessor(
     fps=int(1 / resolution),
     transition_lambda=transition_lambda,
 )
-
 
 def DBN_beat_track(beat_act, downbeat_act):
     """
@@ -39,7 +42,17 @@ def DBN_beat_track(beat_act, downbeat_act):
     downbeats = downbeats[:, 0][downbeats[:, 1] == 1]
     return beats, downbeats
     
-def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True, merge_downbeats=True):
+# ==================== Proposed beat tracker ====================
+
+
+def post_process(
+    onsets, 
+    beat_probs, 
+    downbeat_probs, 
+    dynamic_thresholding=True, 
+    merge_downbeats=True,
+    dynamic_programming=True,
+):
     """
     Post-processing of beat and downbeat tracking results for proposed model.
 
@@ -103,9 +116,10 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True, 
             if np.min(np.abs(beats - downbeat)) > tolerance * 2:
                 beats_to_merge.append(downbeat)
         beats = np.concatenate([beats, beats_to_merge])
-        beats = sorted(beats)
+        beats = np.sort(beats)
 
     # ========= fill up out-of-note beats by inter-beat intervals =========
+    # fill up by neighboring beats
     wlen = 5  # window length for getting neighboring inter-beat intervals (+- wlen)
     IBIs = np.diff(beats)
     beats_filled = []
@@ -122,8 +136,52 @@ def post_process(onsets, beat_probs, downbeat_probs, dynamic_thresholding=True, 
             if abs(ibi / ibis_near_median - ratio) / ratio < 0.15:
                 for x in range(1, ratio):
                     beats_filled.append(beats[i] + x * ibi / ratio)
-    beats = np.array(beats_filled)
+    beats = np.sort(np.array(beats_filled))
 
-    return np.sort(beats), np.sort(downbeats)
+    if dynamic_programming:
+        beats = run_dynamic_programming(beats)
 
+    return beats, downbeats
+
+
+# ========= dynamic programming ========================================
+# minimize objective function:
+#   O = sum(abs(log((t[k] - t[k-1]) / (t[k-1] - t[k-2]))))      (O1)
+#       + lam1 * insertions                                     (O2)
+#       + lam2 * deletions                                      (O3)
+#   t[k] is the kth beat after dynamic programming.
+# ======================================================================
+
+def run_dynamic_programming(beats, penalty=1.0):
+    beats_dp = [
+        [beats[0], beats[1]],     # no insertion
+        [beats[0], beats[1]],     # insert one beat
+        [beats[0], beats[1]],     # insert two beats
+        [beats[0], beats[1]],     # insert three beats
+    ]
+    obj_dp = [0, 0, 0, 0]
+
+    for i in range(2, len(beats)):
+        beats_dp_new = [0] * len(beats_dp)
+        obj_dp_new = [0, 0, 0, 0]
+
+        # insert x beats
+        for x in range(4):
+            ibi = (beats[i] - beats[i-1]) / (x + 1)
+            objs = []
+            for x_prev in range(4):
+                o1 = np.abs(np.log(ibi / (beats_dp[x_prev][-1] - beats_dp[x_prev][-2])))
+                o = obj_dp[x_prev] + o1 + penalty * x
+                objs.append(o)
+
+            x_prev_best = np.argmin(objs)
+            beats_dp_new[x] = beats_dp[x_prev_best] + [beats[i-1] + ibi * k for k in range(1, x+1)] + [beats[i]]
+            obj_dp_new[x] = objs[x_prev_best]
+
+        beats_dp = beats_dp_new
+        obj_dp = obj_dp_new
+
+    x_best = np.argmin(obj_dp)
+    beats = beats_dp[x_best]
+    return np.array(beats)
 

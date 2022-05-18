@@ -4,7 +4,8 @@ import numpy as np
 ## quantisation resolution
 resolution = 0.01  # quantization resolution: 0.01s = 10ms
 tolerance = 0.05  # tolerance for beat alignment: 0.05s = 50ms
-ibiVocab = int(4 / resolution) + 1  # vocabulary size for ibi: 4s = 4/0.01s + 1
+ibiVocab = int(4 / resolution) + 1  # vocabulary size for ibi: 4s = 4/0.01s + 1, index 0 is ignored during training
+ibiVocab_new = int(1.5 / resolution) + 1
 
 # =========== time signature definitions ===========
 tsDenominators = [0, 2, 4, 8]  # 0 for others
