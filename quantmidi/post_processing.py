@@ -2,11 +2,14 @@ import madmom
 import numpy as np
 from enum import IntEnum, auto
 from collections import defaultdict
+from functools import cmp_to_key
+import mido
 
 from quantmidi.data.constants import resolution, tolerance
 
 min_bpm = 40
 max_bpm = 220
+ticks_per_beat = 240
 
 # ==================== DBN beat tracker ====================
 
@@ -118,6 +121,21 @@ def post_process(
         beats = np.concatenate([beats, beats_to_merge])
         beats = np.sort(beats)
 
+    if dynamic_programming:
+        beats = run_dynamic_programming(beats)
+
+    return beats, downbeats
+
+# ========= dynamic programming ========================================
+# minimize objective function:
+#   O = sum(abs(log((t[k] - t[k-1]) / (t[k-1] - t[k-2]))))      (O1)
+#       + lam1 * insertions                                     (O2)
+#       + lam2 * deletions                                      (O3)
+#   t[k] is the kth beat after dynamic programming.
+# ======================================================================
+
+def run_dynamic_programming(beats, penalty=1.0):
+
     # ========= fill up out-of-note beats by inter-beat intervals =========
     # fill up by neighboring beats
     wlen = 5  # window length for getting neighboring inter-beat intervals (+- wlen)
@@ -138,21 +156,7 @@ def post_process(
                     beats_filled.append(beats[i] + x * ibi / ratio)
     beats = np.sort(np.array(beats_filled))
 
-    if dynamic_programming:
-        beats = run_dynamic_programming(beats)
-
-    return beats, downbeats
-
-
-# ========= dynamic programming ========================================
-# minimize objective function:
-#   O = sum(abs(log((t[k] - t[k-1]) / (t[k-1] - t[k-2]))))      (O1)
-#       + lam1 * insertions                                     (O2)
-#       + lam2 * deletions                                      (O3)
-#   t[k] is the kth beat after dynamic programming.
-# ======================================================================
-
-def run_dynamic_programming(beats, penalty=1.0):
+    # ============= insertions and deletions ======================
     beats_dp = [
         [beats[0], beats[1]],     # no insertion
         [beats[0], beats[1]],     # insert one beat
@@ -185,3 +189,178 @@ def run_dynamic_programming(beats, penalty=1.0):
     beats = beats_dp[x_best]
     return np.array(beats)
 
+def generate_MIDI_score(note_sequence, annotations, output_file):
+    print('Generating MIDI score...')
+
+    # get notes and annotations
+    pitches = note_sequence[:,0]
+    onsets = note_sequence[:,1]
+    durations = note_sequence[:,2]
+    velocities = note_sequence[:,3]
+    length = len(note_sequence)
+
+    beats = sorted(list(annotations['beats']))
+    downbeats = annotations['downbeats']
+    time_signatures = annotations['time_signatures']
+    keys = annotations['keys']
+    onsets_musical = annotations['onsets_musical']
+    note_values = annotations['note_values']
+    hands = annotations['hands']
+
+    if onsets[0] < beats[0]:
+        beats = [beats[0] - (beats[1] - beats[0])] + beats
+        if beats[0] < 0:
+            beats[0] = 0
+    while max(onsets+durations) > beats[-1]:
+        beats.append(beats[-1] + (beats[-1] - beats[-2]))
+    start_time = beats[0]
+    end_time = beats[-1]
+    
+    time_signature_changes = [[downbeats[0], time_signatures[0][0], time_signatures[1][0]]]
+    for i in range(1, length):
+        if time_signatures[0][i] != time_signatures[0][i-1] or time_signatures[1][i] != time_signatures[1][i-1]:
+            time_signature_changes.append([onsets[i], time_signatures[0][i], time_signatures[1][i]])
+
+    key_changes = [[downbeats[0], keys[0]]]
+    for i in range(1, length):
+        if keys[i] != keys[i-1]:
+            key_changes.append([onsets[i], keys[i]])
+
+    # create MIDI file
+    mido_data = mido.MidiFile(ticks_per_beat=ticks_per_beat)
+
+    # get time2tick from beats, in mido, every beat is divided into ticks
+    time2tick_dict = np.zeros(int(round(end_time / resolution)) + 1, dtype=int)
+    for i in range(1, len(beats)):
+        lt = int(round(beats[i-1] / resolution))
+        rt = int(round(beats[i]  / resolution))
+        ltick = (i-1) * ticks_per_beat
+        rtick = i * ticks_per_beat
+        time2tick_dict[lt:rt+1] = np.round(np.linspace(ltick, rtick, rt-lt+1)).astype(int)
+    def time2tick(time):
+        return time2tick_dict[int(round(time / resolution))]
+    
+    # track 0 with time and key information
+    track_0 = mido.MidiTrack()
+    # # time signatures
+    # for ts in time_signature_changes:
+    #     track_0.append(
+    #         mido.MetaMessage('time_signature',
+    #             time=time2tick(ts[0]),
+    #             numerator=ts[1],
+    #             denominator=ts[2],
+    #         )
+    #     )
+    # key signature
+    for ks in key_changes:
+        track_0.append(
+            mido.MetaMessage('key_signature',
+                time=time2tick(ks[0]),
+                key=ks[1],
+            )
+        )
+
+    # add hand parts in different tracks
+    track_left = mido.MidiTrack()
+    track_right = mido.MidiTrack()
+    # program number (instrument: piano)
+    track_left.append(mido.Message('program_change', time=0, program=0, channel=0))
+    track_right.append(mido.Message('program_change', time=0, program=0, channel=1))
+
+    # notes
+    prev_onset_seconds = 0  # track onsets for tempo update
+    prev_onset_ticks = 0
+    for ni in range(length):
+
+        # onset musical from onset prediction or from beat prediction
+        subticks_o = int(onsets_musical[ni] * ticks_per_beat)
+        subticks_b = time2tick(onsets[ni]) % ticks_per_beat
+        beat_idx = time2tick(onsets[ni]) // ticks_per_beat
+        if abs(subticks_o - subticks_b) < 10:
+            onset_ticks = beat_idx * ticks_per_beat + subticks_o
+        else:
+            onset_ticks = beat_idx * ticks_per_beat + subticks_b
+        
+        # udpate tempo changes by onsets
+        if onset_ticks - prev_onset_ticks >= 10:
+            tempo = 1e+6 * (onsets[ni] - prev_onset_seconds) / ((onset_ticks - prev_onset_ticks) / ticks_per_beat)
+            track_0.append(
+                mido.MetaMessage('set_tempo',
+                    time=prev_onset_ticks,
+                    tempo=int(tempo),
+                )
+            )
+            prev_onset_seconds = onsets[ni]
+            prev_onset_ticks = onset_ticks
+
+        # note value from note value prediction or from beat prediction
+        offset_ticks = time2tick(onsets[ni]+durations[ni])
+        durticks_d = int(durations[ni]) * ticks_per_beat % ticks_per_beat
+        durticks_b = offset_ticks % ticks_per_beat
+        beat_idx = offset_ticks // ticks_per_beat
+        if abs(durticks_d - durticks_b) < 10:
+            offset_ticks = beat_idx * ticks_per_beat + durticks_d
+        if offset_ticks < onset_ticks:
+            offset_ticks = onset_ticks + 10
+        
+        pitch = int(pitches[ni])
+        velocity = int(velocities[ni])
+        channel = int(hands[ni])
+        track = track_left if channel == 0 else track_right
+        track.append(
+            mido.Message('note_on',
+                time=time2tick(onsets[ni]),
+                note=pitch,
+                velocity=velocity,
+                channel=channel,
+            )
+        )
+        track.append(
+            mido.Message('note_off',
+                time=time2tick(onsets[ni]+durations[ni]),
+                note=pitch,
+                velocity=0,
+                channel=channel,
+            )
+        )
+
+    for track in [track_left, track_right]:
+        track.sort(key=cmp_to_key(event_compare))
+        track.append(mido.MetaMessage('end_of_track', time=track[-1].time+1))
+        mido_data.tracks.append(track)
+
+    # udpate track_0 together with tempo changes
+    track_0.sort(key=cmp_to_key(event_compare))
+    track_0.append(mido.MetaMessage('end_of_track', time=track_0[-1].time+1))
+    mido_data.tracks.insert(0, track_0)
+
+    # ticks from absolute to relative
+    for track in mido_data.tracks:
+        tick = 0
+        for event in track:
+            event.time -= tick
+            tick += event.time
+
+    mido_data.save(filename=output_file)
+
+
+def event_compare(event1, event2):
+    secondary_sort = {
+        'set_tempo': lambda e: (1 * 256 * 256),
+        'time_signature': lambda e: (2 * 256 * 256),
+        'key_signature': lambda e: (3 * 256 * 256),
+        'lyrics': lambda e: (4 * 256 * 256),
+        'text_events' :lambda e: (5 * 256 * 256),
+        'program_change': lambda e: (6 * 256 * 256),
+        'pitchwheel': lambda e: ((7 * 256 * 256) + e.pitch),
+        'control_change': lambda e: (
+            (8 * 256 * 256) + (e.control * 256) + e.value),
+        'note_off': lambda e: ((9 * 256 * 256) + (e.note * 256)),
+        'note_on': lambda e: (
+            (10 * 256 * 256) + (e.note * 256) + e.velocity) if e.velocity > 0 
+            else ((9 * 256 * 256) + (e.note * 256)),
+        'end_of_track': lambda e: (11 * 256 * 256)
+    }
+    if event1.time == event2.time and event1.type in secondary_sort and event2.type in secondary_sort:
+        return secondary_sort[event1.type](event1) - secondary_sort[event2.type](event2)
+    return event1.time - event2.time

@@ -10,14 +10,23 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import mir_eval
+import pretty_midi as pm
 from pathlib import Path
+from subprocess import check_output
+from functools import cmp_to_key, reduce
 
+from quantmidi.data.data_utils import DataUtils
 from quantmidi.data.data_module import QuantMIDIDataModule
 from quantmidi.models.note_sequence import NoteSequenceModel
 from quantmidi.models.baseline import BaselineModel
 from quantmidi.models.proposed import ProposedModel
-from quantmidi.post_processing import DBN_beat_track, post_process
-from quantmidi.data.constants import resolution
+from quantmidi.post_processing import DBN_beat_track, post_process, generate_MIDI_score
+from quantmidi.data.constants import (
+    tsIndex2Nume,
+    tsIndex2Deno,
+    keyNumber2Name,
+    N_per_beat,
+)
 
 ## -------------------------
 ## DEBUGGING BLOCK
@@ -140,9 +149,11 @@ def evaluate(args):
 
     # ========= iterate over the test set and evaluate =========
     evals_beats, evals_downbeats = [], []  # beat-level F-measure
+    if args.model_type == 'proposed':
+        mv2h_results = []
 
     for i, row in metadata.iterrows():
-        print('Evaluating {}/{}'.format(i+1, len(metadata)), end='\r')
+        print('Evaluating {}/{}'.format(i+1, len(metadata)))
         # get model input and ground truth annotations
         note_sequence, annotations = pickle.load(open(str(Path(feature_folder, row['feature_file'])), 'rb'))
         note_sequence = note_sequence.unsqueeze(0).to(device)
@@ -162,10 +173,61 @@ def evaluate(args):
             y_b, y_db, y_tempo, y_time_nume, y_time_deno, y_key, y_onset, y_value, y_hands = model(note_sequence)
             y_b = y_b.squeeze(0).cpu().detach().numpy()
             y_db = y_db.squeeze(0).cpu().detach().numpy()
-            y_tempo = y_tempo.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy() * resolution
+            y_time_nume = y_time_nume.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy()
+            y_time_deno = y_time_deno.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy()
+            y_key = y_key.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy()
+            y_onset = y_onset.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy()
+            y_value = y_value.squeeze(0).topk(1, dim=0)[1][0].cpu().detach().numpy()
+            y_hands = y_hands.squeeze(0).cpu().detach().numpy()
 
+            # get beats and downbeats predictions
             onsets = note_sequence[0,:,1].cpu().detach().numpy()
             beats_pred, downbeats_pred = post_process(onsets, y_b, y_db)
+
+            # generate MIDI score
+            Path.mkdir(Path('outputs'), exist_ok=True)
+            midi_score_file = str(Path('outputs', row['performance_id']+'_proposed_test.mid'))
+
+            time_numes = [tsIndex2Nume[tn] for tn in y_time_nume]
+            time_denos = [tsIndex2Deno[td] for td in y_time_deno]
+            keys = [keyNumber2Name[k] for k in y_key]
+            # version 1
+            onsets_musical = y_onset / N_per_beat
+            note_values = y_value / N_per_beat
+            # version 2
+            # TO ADD
+            hands = np.round(y_hands)
+
+            generate_MIDI_score(
+                note_sequence=note_sequence.squeeze(0).cpu().detach().numpy(), 
+                annotations={
+                    'beats': beats_pred,
+                    'downbeats': downbeats_pred,
+                    'time_signatures': (time_numes, time_denos),
+                    'keys': keys,
+                    'onsets_musical': onsets_musical,
+                    'note_values': note_values,
+                    'hands': hands,
+                }, 
+                output_file=midi_score_file,
+            )
+            # import pretty_midi as pm
+            # midi_targ = pm.PrettyMIDI(row['midi_perfm'])
+            # midi_pred = pm.PrettyMIDI(midi_score_file)
+            # notes_targ = midi_targ.instruments[0].notes
+            # notes_pred = midi_pred.instruments[0].notes
+            # for m in range(30):
+            #     print(notes_targ[m], notes_pred[m])
+            #     input()
+            # print(midi_targ.get_end_time(), midi_pred.get_end_time())
+            # input()
+            try:
+                mv2h_result = mv2h_evaluation(row['midi_perfm'], midi_score_file, args.MV2H_path)
+                print(mv2h_result)
+                if mv2h_result['Multi-pitch'] > 0.9:
+                    mv2h_results.append(mv2h_result)
+            except:
+                print('pass')
 
         elif args.model_type == 'note_sequence':
             y_b, y_db = model(note_sequence)
@@ -206,6 +268,116 @@ def evaluate(args):
     print('Downbeat tracking:')
     print('F-measure: {:.4f}'.format(np.mean(evals_downbeats)))
 
+    if args.model_type == 'proposed':
+        print('\n ======== MV2H evaluation =========')
+        print('Multi-pitch: {:.4f}'.format(np.mean([r['Multi-pitch'] for r in mv2h_results])))
+        print('Voice: {:.4f}'.format(np.mean([r['Voice'] for r in mv2h_results])))
+        print('Meter: {:.4f}'.format(np.mean([r['Meter'] for r in mv2h_results])))
+        print('Value: {:.4f}'.format(np.mean([r['Value'] for r in mv2h_results])))
+        print('Harmony: {:.4f}'.format(np.mean([r['Harmony'] for r in mv2h_results])))
+        print('Average: {:.4f}'.format(np.mean([np.mean([r['Voice'], r['Meter'], r['Value'], r['Harmony']]) for r in mv2h_results])))
+        print('MV2H: {:.4f}'.format(np.mean([r['MV2H'] for r in mv2h_results])))
+
+
+def evaluate_mv2h(args):
+
+    feature_folder = str(Path(args.workspace, 'features'))
+
+    # ========= get test set metadata =========
+    metadata = pd.read_csv(str(Path(feature_folder, 'metadata.csv')))
+    metadata = metadata[metadata['split'] == 'test']
+    metadata.reset_index(inplace=True)
+
+    mv2h_results = []
+
+    for i, row in metadata.iterrows():
+        print('Evaluating {}/{}'.format(i+1, len(metadata)))
+
+        midi_targ_file = row['midi_perfm']
+        midi_pred_file = str(Path('outputs', row['performance_id']+'_finale.mid'))
+
+
+        # import pretty_midi as pm
+        # import time
+        # midi_targ = pm.PrettyMIDI(midi_targ_file)
+        # midi_pred = pm.PrettyMIDI(midi_pred_file)
+        # # notes_targ = midi_targ.instruments[0].notes
+        # # notes_pred = midi_pred.instruments[0].notes
+        # # for m in range(30):
+        # #     print(notes_targ[m], notes_pred[m])
+        # #     input()
+        # print('target hand parts:', len(midi_targ.instruments))
+        # print(midi_targ.get_end_time(), midi_pred.get_end_time())
+        try:
+            mv2h_result = mv2h_evaluation(midi_targ_file, midi_pred_file, args.MV2H_path)
+            print(mv2h_result)
+            # if mv2h_result['Multi-pitch'] > 0.9:
+            #     mv2h_results.append(mv2h_result)
+            mv2h_results.append(mv2h_result)
+        except:
+            print('pass')
+
+    print('\n ======== MV2H evaluation =========')
+    print('Multi-pitch: {:.4f}'.format(np.mean([r['Multi-pitch'] for r in mv2h_results])))
+    print('Voice: {:.4f}'.format(np.mean([r['Voice'] for r in mv2h_results])))
+    print('Meter: {:.4f}'.format(np.mean([r['Meter'] for r in mv2h_results])))
+    print('Value: {:.4f}'.format(np.mean([r['Value'] for r in mv2h_results])))
+    print('Harmony: {:.4f}'.format(np.mean([r['Harmony'] for r in mv2h_results])))
+    print('Average: {:.4f}'.format(np.mean([np.mean([r['Voice'], r['Meter'], r['Value'], r['Harmony']]) for r in mv2h_results])))
+    print('MV2H: {:.4f}'.format(np.mean([r['MV2H'] for r in mv2h_results])))
+
+
+        
+def get_test_performance_midis(args):
+
+    feature_folder = str(Path(args.workspace, 'features'))
+
+    # ========= get test set metadata =========
+    metadata = pd.read_csv(str(Path(feature_folder, 'metadata.csv')))
+    metadata = metadata[metadata['split'] == 'test']
+    metadata.reset_index(inplace=True)
+
+    for i, row in metadata.iterrows():
+        print('{}/{}'.format(i+1, len(metadata)))
+
+        midi_data_score = pm.PrettyMIDI(row['midi_perfm'])
+        notes = reduce(lambda x, y: x+y, [inst.notes for inst in midi_data_score.instruments])
+        notes = sorted(notes, key=cmp_to_key(DataUtils.compare_note_order))
+
+        midi_data_perfm = pm.PrettyMIDI()
+        midi_data_perfm.instruments.append(pm.Instrument(0))
+        for note in notes:
+            midi_data_perfm.instruments[0].notes.append(
+                pm.Note(
+                    velocity=note.velocity,
+                    pitch=note.pitch,
+                    start=note.start,
+                    end=note.end,
+                )
+            )
+
+        Path.mkdir(Path('./outputs_perfm'), parents=True, exist_ok=True)
+        midi_perfm_file = str(Path('outputs_perfm', row['performance_id']+'_perfm.mid'))
+        midi_data_perfm.write(midi_perfm_file)
+        
+
+def mv2h_evaluation(target_midi_file, output_midi_file, MV2H_path, timeout=20.):
+        try:
+            output = check_output(['sh', 'evaluate_midi_mv2h.sh', 
+                                    target_midi_file, output_midi_file, MV2H_path], 
+                                    timeout=timeout)
+        except ValueError as e:
+            print('Failed to evaluate pair: \ntarget midi: {}\noutput midi: {}'.format(target_midi_file,
+                                                                            output_midi_file))
+
+        # extract result from output
+        result_list = output.decode('utf-8').splitlines()[-6:]
+        result = dict([tuple(item.split(': ')) for item in result_list])
+        for key, value in result.items():
+            result[key] = float(value)
+        
+        return result
+
 if __name__ == '__main__':
     
     # ========= parse arguments =========
@@ -215,13 +387,14 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_folder', type=str, nargs='+', help='Path to the dataset folders \
                         in the order of ASAP, A_MAPS, CPM, ACPAS')
     parser.add_argument('--workspace', type=str, help='Path to the workspace')
+    parser.add_argument('--MV2H_path', type=str, help='Path to the MV2H folder')
 
     # experiment settings
     parser.add_argument('--experiment_name', type=str, help='Name of the experiment', default='full-training')
     parser.add_argument('--run_name', type=str, help='Name of the run', default='run-0')
     
     parser.add_argument('--option', type=str, help='Options for the experiment, select from [train, test, \
-                        evaluate]', default='train')
+                        evaluate, evaluate_mv2h]', default='train')
     parser.add_argument('--model_type', type=str, help='Type of the model, select one from [note_sequence, \
                         baseline, proposed]', default='proposed')
     parser.add_argument('--resume_training', type=int, help='Whether to resume training from the last \
@@ -299,3 +472,7 @@ if __name__ == '__main__':
         train_or_test(args)
     elif args.option == 'evaluate':
         evaluate(args)
+    elif args.option == 'evaluate_mv2h':
+        evaluate_mv2h(args)
+    elif args.option == 'get_test_performance_midis':
+        get_test_performance_midis(args)

@@ -9,6 +9,8 @@ A_MAPS="/import/c4dm-datasets/A2S_transcription/working/datasets/A-MAPS_1.1"
 CPM="/import/c4dm-datasets/A2S_transcription/working/datasets/CPM"
 ACPAS="/import/c4dm-datasets/A2S_transcription/working/datasets/ACPAS"
 
+MV2H_path="/import/c4dm-datasets/A2S_transcription/working/MV2H/bin"
+
 # TODO: script to download the dataset
 
 # # =============== Feature preparation ================
@@ -26,7 +28,7 @@ experiment_name="Default"
 run_name='default'
 
 option="evaluate"  # "train", "test" or "evaluate"
-model_type="note_sequence"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
+model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 resume_training=1  # 1 or 0 | default: 0
 plot_results=0  # 1 or 0 | default: 0 | for evaluation only
 
@@ -56,19 +58,22 @@ proposed_model_version=1  # 1 or 2 | default: 1
 workers=4  # default: 8, debug: 0
 gpus=4  # default: 4, debug: 1
 
+# baseline model final version
+# model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/MIDI-quantisation/checkpoints/baseline-epoch=40-val_f_beat=0.6912.ckpt"
 # note sequence model final version
-model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
+# model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/7/e32c1cdaa41b4733959998d34783deeb/checkpoints/epoch=251-val_f_beat=0.8962.ckpt"
 # proposed model final version
 # v1
-# model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/9/5687f6cc9b8b4546a33c8e1fda64c11e/checkpoints/epoch=105-val_f_beat=0.8682.ckpt"
+model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/9/5687f6cc9b8b4546a33c8e1fda64c11e/checkpoints/epoch=105-val_f_beat=0.8682.ckpt"
 # v2
 # model_checkpoint="/import/c4dm-datasets/A2S_transcription/working/workspace/MIDI-quantisation/mlruns/9/08f633f558e34afea9ba4f204c8dd9ef/checkpoints/last.ckpt"
 
-echo ">>> "$option" the model"
+echo ">>> Option: "$option
 
 python3 quantmidi/main.py \
     --dataset_folder $ASAP $A_MAPS $CPM $ACPAS \
     --workspace $WORKSPACE \
+    --MV2H_path $MV2H_path \
     --experiment_name $experiment_name \
     --run_name $run_name \
     --option $option \
