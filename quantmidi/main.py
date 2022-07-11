@@ -294,7 +294,7 @@ def evaluate_mv2h(args):
         print('Evaluating {}/{}'.format(i+1, len(metadata)))
 
         midi_targ_file = row['midi_perfm']
-        midi_pred_file = str(Path('outputs', row['performance_id']+'_finale.mid'))
+        midi_pred_file = str(Path('outputs', row['performance_id']+'_proposed_test.mid'))
 
 
         # import pretty_midi as pm

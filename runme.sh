@@ -27,7 +27,7 @@ MV2H_path="/import/c4dm-datasets/A2S_transcription/working/MV2H/bin"
 experiment_name="Default"
 run_name='default'
 
-option="evaluate"  # "train", "test" or "evaluate"
+option="evaluate_mv2h"  # "train", "test" or "evaluate"
 model_type="proposed"  # "note_sequence", "baseline" or "proposed"  | default: "proposed"
 resume_training=1  # 1 or 0 | default: 0
 plot_results=0  # 1 or 0 | default: 0 | for evaluation only
