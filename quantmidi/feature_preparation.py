@@ -65,6 +65,7 @@ class FeaturePreparation():
             'midi_perfm',
             'annot_file',
             'feature_file',
+            'performance_MIDI_external',
         ])
 
         format_path = lambda x: x.format(ASAP=self.ASAP, A_MAPS=self.A_MAPS, CPM=self.CPM)
@@ -117,6 +118,7 @@ class FeaturePreparation():
                 'midi_perfm': midi_perfm,
                 'annot_file': annot_file,
                 'feature_file': str(feature_file),
+                'performance_MIDI_external': row['performance_MIDI_external'],
             }, ignore_index=True)
 
         # ======== save metadata ==========
@@ -145,22 +147,26 @@ class FeaturePreparation():
         
         # =========== number of performances ===========
         self.verboseprint('INFO: Get number of performances')
-        piece2perfm_label = defaultdict(set)
+
+        def get_performance_label(row):
+            if row['split'] == 'test':
+                print('-'.join([row['source'], str(row['piece_id'])]))
+                
+            if row['source'] == 'ASAP':
+                return row['performance_MIDI_external']
+            else:
+                return '-'.join([row['source'], str(row['piece_id'])])
+
+        performance_labels = {'train': set(), 'valid': set(), 'test': set()}
         perfms = {'train': set(), 'valid': set(), 'test': set()}
 
         for _, row in self.metadata.iterrows():
             if row['split'] == '--':
                 continue
 
-            if row['source'] == 'ASAP':
-                perfm_label = row['midi_perfm']
-            elif row['source'] == 'MAPS':
-                perfm_label = '_'.join(row['midi_perfm'].split('/')[-1][len('MAPS_MUS-'):].split('_')[:-1])
-            elif row['source'] == 'CPM':
-                perfm_label = row['midi_perfm'].split('/')[-1][:-4]
-            
-            if perfm_label not in piece2perfm_label[row['piece_id']]:
-                piece2perfm_label[row['piece_id']].add(perfm_label)
+            performance_label = get_performance_label(row)
+            if performance_label not in performance_labels[row['split']]:
+                performance_labels[row['split']].add(performance_label)
                 perfms[row['split']].add(row['performance_id'])
             
         perfms_all = perfms['train'] | perfms['valid'] | perfms['test']
@@ -284,6 +290,7 @@ if __name__ == '__main__':
     # ========= feature preparation =========
     featprep = FeaturePreparation(args.dataset_folder, args.feature_folder, args.workers, args.verbose)
     # featprep.prepare_metadata()
-    # featprep.print_statistics()
     featprep.load_metadata()
-    featprep.prepare_features()
+    featprep.print_statistics()
+    # featprep.load_metadata()
+    # featprep.prepare_features()
