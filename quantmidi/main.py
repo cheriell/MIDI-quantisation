@@ -184,9 +184,12 @@ def evaluate(args):
             onsets = note_sequence[0,:,1].cpu().detach().numpy()
             beats_pred, downbeats_pred = post_process(onsets, y_b, y_db)
 
+            # Saave beats predictions
+            pd.DataFrame(beats_pred, columns=['beats_pred']).to_csv(str(Path('outputs_beats', row['performance_id']+'_beats_pred.csv')), index=False)
+
             # generate MIDI score
             Path.mkdir(Path('outputs'), exist_ok=True)
-            midi_score_file = str(Path('outputs', row['performance_id']+'_proposed_test.mid'))
+            midi_score_file = str(Path('outputs', row['performance_id']+'_proposed_test_ignore.mid'))
 
             time_numes = [tsIndex2Nume[tn] for tn in y_time_nume]
             time_denos = [tsIndex2Deno[td] for td in y_time_deno]
@@ -224,8 +227,6 @@ def evaluate(args):
             try:
                 mv2h_result = mv2h_evaluation(row['midi_perfm'], midi_score_file, args.MV2H_path)
                 print(mv2h_result)
-                if mv2h_result['Multi-pitch'] > 0.9:
-                    mv2h_results.append(mv2h_result)
             except:
                 print('pass')
 
@@ -294,7 +295,7 @@ def evaluate_mv2h(args):
         print('Evaluating {}/{}'.format(i+1, len(metadata)))
 
         midi_targ_file = row['midi_perfm']
-        midi_pred_file = str(Path('outputs', row['performance_id']+'_proposed_test.mid'))
+        midi_pred_file = str(Path('outputs', row['performance_id']+'_proposed_test_1.mid'))
 
 
         # import pretty_midi as pm
@@ -316,15 +317,17 @@ def evaluate_mv2h(args):
             mv2h_results.append(mv2h_result)
         except:
             print('pass')
+            print(midi_targ_file, midi_pred_file)
+            input('enter to continue')
 
-    print('\n ======== MV2H evaluation =========')
-    print('Multi-pitch: {:.4f}'.format(np.mean([r['Multi-pitch'] for r in mv2h_results])))
-    print('Voice: {:.4f}'.format(np.mean([r['Voice'] for r in mv2h_results])))
-    print('Meter: {:.4f}'.format(np.mean([r['Meter'] for r in mv2h_results])))
-    print('Value: {:.4f}'.format(np.mean([r['Value'] for r in mv2h_results])))
-    print('Harmony: {:.4f}'.format(np.mean([r['Harmony'] for r in mv2h_results])))
-    print('Average: {:.4f}'.format(np.mean([np.mean([r['Voice'], r['Meter'], r['Value'], r['Harmony']]) for r in mv2h_results])))
-    print('MV2H: {:.4f}'.format(np.mean([r['MV2H'] for r in mv2h_results])))
+        print('\n ======== MV2H evaluation =========')
+        print('Multi-pitch: {:.4f}'.format(np.mean([r['Multi-pitch'] for r in mv2h_results])))
+        print('Voice: {:.4f}'.format(np.mean([r['Voice'] for r in mv2h_results])))
+        print('Meter: {:.4f}'.format(np.mean([r['Meter'] for r in mv2h_results])))
+        print('Value: {:.4f}'.format(np.mean([r['Value'] for r in mv2h_results])))
+        print('Harmony: {:.4f}'.format(np.mean([r['Harmony'] for r in mv2h_results])))
+        print('Average: {:.4f}'.format(np.mean([np.mean([r['Voice'], r['Meter'], r['Value'], r['Harmony']]) for r in mv2h_results])))
+        print('MV2H: {:.4f}'.format(np.mean([r['MV2H'] for r in mv2h_results])))
 
 
         

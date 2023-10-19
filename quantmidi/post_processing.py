@@ -276,14 +276,16 @@ def generate_MIDI_score(note_sequence, annotations, output_file):
         subticks_o = int(onsets_musical[ni] * ticks_per_beat)
         subticks_b = time2tick(onsets[ni]) % ticks_per_beat
         beat_idx = time2tick(onsets[ni]) // ticks_per_beat
-        if abs(subticks_o - subticks_b) < 10:
+        if abs(subticks_o - subticks_b) < 20:
             onset_ticks = beat_idx * ticks_per_beat + subticks_o
         else:
             onset_ticks = beat_idx * ticks_per_beat + subticks_b
         
         # udpate tempo changes by onsets
-        if onset_ticks - prev_onset_ticks >= 10:
-            tempo = 1e+6 * (onsets[ni] - prev_onset_seconds) / ((onset_ticks - prev_onset_ticks) / ticks_per_beat)
+        if onset_ticks - prev_onset_ticks >= 20:
+            # tempo = 1e+6 * (onsets[ni] - prev_onset_seconds) / ((onset_ticks - prev_onset_ticks) / ticks_per_beat)
+            # constant tempo
+            tempo = 500000 # 120 bpm
             track_0.append(
                 mido.MetaMessage('set_tempo',
                     time=prev_onset_ticks,
@@ -298,10 +300,10 @@ def generate_MIDI_score(note_sequence, annotations, output_file):
         durticks_d = int(durations[ni]) * ticks_per_beat % ticks_per_beat
         durticks_b = offset_ticks % ticks_per_beat
         beat_idx = offset_ticks // ticks_per_beat
-        if abs(durticks_d - durticks_b) < 10:
+        if abs(durticks_d - durticks_b) < 20:
             offset_ticks = beat_idx * ticks_per_beat + durticks_d
         if offset_ticks < onset_ticks:
-            offset_ticks = onset_ticks + 10
+            offset_ticks = onset_ticks + 20
         
         pitch = int(pitches[ni])
         velocity = int(velocities[ni])
